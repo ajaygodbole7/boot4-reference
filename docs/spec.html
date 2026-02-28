@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boot4 Reference API Specification</title>
+<style>
+  :root {
+    --bg: #fafafa; --fg: #1a1a2e; --accent: #0f3460; --border: #ddd;
+    --code-bg: #f4f4f4; --success: #2e7d32; --warn: #e65100; --err: #c62828;
+    --sidebar-w: 260px; --nav-bg: #1a1a2e; --nav-fg: #e0e0e0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+         color: var(--fg); background: var(--bg); line-height: 1.6; }
+
+  /* Sidebar */
+  nav { position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100vh;
+        background: var(--nav-bg); color: var(--nav-fg); overflow-y: auto;
+        padding: 1.5rem 0; z-index: 10; }
+  nav h2 { padding: 0 1rem 1rem; font-size: 1rem; border-bottom: 1px solid #333; margin-bottom: .5rem; }
+  nav .section-label { padding: .5rem 1rem 0; font-size: .7rem; text-transform: uppercase;
+                       letter-spacing: .08em; color: #888; }
+  nav a { display: block; padding: .35rem 1rem; color: var(--nav-fg); text-decoration: none;
+          font-size: .85rem; transition: background .15s; }
+  nav a:hover { background: rgba(255,255,255,.1); }
+
+  /* Main */
+  main { margin-left: var(--sidebar-w); padding: 2rem 3rem 4rem; max-width: 900px; }
+  h1 { font-size: 1.8rem; margin-bottom: .5rem; }
+  h2 { font-size: 1.4rem; margin: 2.5rem 0 .75rem; padding-bottom: .3rem;
+       border-bottom: 2px solid var(--accent); }
+  h3 { font-size: 1.15rem; margin: 1.5rem 0 .5rem; }
+  p, li { margin-bottom: .5rem; }
+  ul { padding-left: 1.5rem; }
+  code { background: var(--code-bg); padding: .15em .4em; border-radius: 3px; font-size: .9em; }
+  pre { background: var(--code-bg); padding: 1rem; border-radius: 6px; overflow-x: auto;
+        font-size: .85rem; margin: .75rem 0 1rem; }
+  pre code { background: none; padding: 0; }
+  table { width: 100%; border-collapse: collapse; margin: .75rem 0 1.25rem; font-size: .9rem; }
+  th, td { text-align: left; padding: .5rem .75rem; border: 1px solid var(--border); }
+  th { background: var(--code-bg); font-weight: 600; }
+  .method { display: inline-block; padding: .15em .5em; border-radius: 3px;
+            font-weight: 700; font-size: .8rem; color: #fff; margin-right: .3rem; }
+  .get { background: var(--success); } .post { background: #1565c0; }
+  .put { background: var(--warn); } .patch { background: #6a1b9a; }
+  .delete { background: var(--err); }
+  .status { font-weight: 600; }
+  .s2xx { color: var(--success); } .s4xx { color: var(--warn); } .s5xx { color: var(--err); }
+  .endpoint-box { background: #fff; border: 1px solid var(--border); border-radius: 8px;
+                  padding: 1.25rem; margin: 1rem 0 1.5rem; }
+  .transition-arrow { color: var(--accent); font-weight: 700; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+
+<nav>
+  <h2>Boot4 Reference API</h2>
+  <span class="section-label">Overview</span>
+  <a href="#overview">Introduction</a>
+  <a href="#conventions">Conventions</a>
+  <a href="#errors">Error Handling</a>
+  <span class="section-label">Products</span>
+  <a href="#list-products">List Products</a>
+  <a href="#get-product">Get Product</a>
+  <a href="#create-product">Create Product</a>
+  <a href="#update-product">Update Product</a>
+  <a href="#patch-product">Patch Product</a>
+  <a href="#delete-product">Delete Product</a>
+  <a href="#transition-product">Transition Status</a>
+  <a href="#product-lifecycle">Lifecycle</a>
+  <span class="section-label">Orders</span>
+  <a href="#create-order">Create Order</a>
+  <a href="#get-order">Get Order</a>
+  <a href="#list-orders">List Orders</a>
+  <a href="#transition-order">Transition Status</a>
+  <a href="#order-lifecycle">Lifecycle</a>
+  <span class="section-label">Reference</span>
+  <a href="#pagination">Keyset Pagination</a>
+  <a href="#idempotency">Idempotency</a>
+  <a href="#dtos">DTOs</a>
+</nav>
+
+<main>
+
+<!-- ============================== OVERVIEW ============================== -->
+
+<h1 id="overview">Boot4 Reference API Specification</h1>
+<p>REST API built with Spring Boot 4.0 / Java 25. All responses use
+<code>application/json</code>. Errors follow <a href="https://www.rfc-editor.org/rfc/rfc9457">RFC 9457 Problem Details</a>.</p>
+
+<p><strong>Base URL:</strong> <code>http://localhost:8080</code><br>
+<strong>Management:</strong> <code>http://localhost:8081</code> (health, metrics, prometheus)</p>
+
+<hr>
+
+<h2 id="conventions">Conventions</h2>
+<ul>
+  <li>IDs are TSID-based <code>Long</code> values (e.g. <code>553726781652992</code>).</li>
+  <li>Timestamps are ISO-8601 UTC (<code>Instant</code>).</li>
+  <li>Prices use <code>BigDecimal</code> with up to 4 decimal places.</li>
+  <li>Status transitions are explicit via <code>POST .../status</code> endpoints.</li>
+  <li>Keyset pagination uses <code>afterCreatedAt</code> + <code>afterId</code> cursors.</li>
+  <li>Optimistic locking: stale writes return <span class="status s4xx">409</span>.</li>
+</ul>
+
+<hr>
+
+<h2 id="errors">Error Handling</h2>
+<p>All errors return <a href="https://www.rfc-editor.org/rfc/rfc9457">RFC 9457 Problem Details</a>:</p>
+<pre><code>{
+  "type": "https://api.boot4ref.example.com/errors/404",
+  "title": "Resource Not Found",
+  "status": 404,
+  "detail": "Product not found with id: 123",
+  "instance": "/api/products/123",
+  "errorCode": "RESOURCE_NOT_FOUND",
+  "timestamp": "2026-03-01T12:00:00Z",
+  "request": {
+    "httpMethod": "GET",
+    "requestPath": "/api/products/123"
+  }
+}</code></pre>
+
+<h3>Error Codes</h3>
+<table>
+  <tr><th>HTTP Status</th><th>Title</th><th>When</th></tr>
+  <tr><td><span class="status s4xx">400</span></td><td>Validation Error</td><td>Bean validation failure, malformed JSON, type mismatch</td></tr>
+  <tr><td><span class="status s4xx">404</span></td><td>Resource Not Found</td><td>Product or order ID does not exist</td></tr>
+  <tr><td><span class="status s4xx">405</span></td><td>Method Not Allowed</td><td>Wrong HTTP method for endpoint</td></tr>
+  <tr><td><span class="status s4xx">409</span></td><td>Resource Conflict</td><td>Invalid status transition, optimistic lock conflict</td></tr>
+  <tr><td><span class="status s4xx">415</span></td><td>Unsupported Media Type</td><td>Wrong Content-Type (e.g. PATCH without <code>application/merge-patch+json</code>)</td></tr>
+  <tr><td><span class="status s4xx">422</span></td><td>Business Rule Violation</td><td>Discontinued product, insufficient stock</td></tr>
+  <tr><td><span class="status s5xx">500</span></td><td>Internal Server Error</td><td>Unexpected error</td></tr>
+  <tr><td><span class="status s5xx">503</span></td><td>Service Unavailable</td><td>Downstream service unavailable</td></tr>
+</table>
+<p>In the <code>dev</code> profile, error responses include <code>exception</code> class name and <code>stackTrace</code>.</p>
+
+<hr>
+
+<!-- ============================== PRODUCTS ============================== -->
+
+<h2>Products</h2>
+
+<div class="endpoint-box" id="list-products">
+  <h3><span class="method get">GET</span> <code>/api/products</code></h3>
+  <p>List products with optional filtering and keyset pagination.</p>
+  <h4>Query Parameters</h4>
+  <table>
+    <tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr>
+    <tr><td><code>status</code></td><td>String</td><td>No</td><td>Filter by status: <code>DRAFT</code>, <code>ACTIVE</code>, <code>DISCONTINUED</code></td></tr>
+    <tr><td><code>minPrice</code></td><td>BigDecimal</td><td>No</td><td>Minimum price (inclusive)</td></tr>
+    <tr><td><code>maxPrice</code></td><td>BigDecimal</td><td>No</td><td>Maximum price (inclusive)</td></tr>
+    <tr><td><code>afterCreatedAt</code></td><td>Instant</td><td>No</td><td>Keyset cursor: <code>createdAt</code> of last seen product</td></tr>
+    <tr><td><code>afterId</code></td><td>Long</td><td>No</td><td>Keyset cursor: <code>id</code> of last seen product</td></tr>
+    <tr><td><code>limit</code></td><td>Integer</td><td>No</td><td>Max results (default 20)</td></tr>
+  </table>
+  <h4>Response</h4>
+  <p><span class="status s2xx">200</span> &mdash; <code>List&lt;ProductResponse&gt;</code></p>
+<pre><code>[
+  {
+    "id": 553726781652992,
+    "name": "Ergonomic Keyboard",
+    "description": "Mechanical switches with split design",
+    "price": 149.99,
+    "stock": 42,
+    "status": "ACTIVE",
+    "createdAt": "2026-03-01T10:00:00Z",
+    "updatedAt": "2026-03-01T10:00:00Z"
+  }
+]</code></pre>
+</div>
+
+<div class="endpoint-box" id="get-product">
+  <h3><span class="method get">GET</span> <code>/api/products/{id}</code></h3>
+  <p>Get a single product by ID.</p>
+  <h4>Path Parameters</h4>
+  <table>
+    <tr><th>Name</th><th>Type</th><th>Description</th></tr>
+    <tr><td><code>id</code></td><td>Long</td><td>Product ID (TSID)</td></tr>
+  </table>
+  <h4>Responses</h4>
+  <p><span class="status s2xx">200</span> &mdash; <code>ProductResponse</code></p>
+  <p><span class="status s4xx">404</span> &mdash; Product not found</p>
+</div>
+
+<div class="endpoint-box" id="create-product">
+  <h3><span class="method post">POST</span> <code>/api/products</code></h3>
+  <p>Create a new product. Initial status is always <code>DRAFT</code>.</p>
+  <h4>Request Body</h4>
+  <p><code>Content-Type: application/json</code></p>
+<pre><code>{
+  "name": "Ergonomic Keyboard",       // required, 3-100 chars
+  "description": "Split design...",    // optional, max 500 chars
+  "price": 149.99,                     // required, positive
+  "stock": 42                          // required, >= 0
+}</code></pre>
+  <h4>Responses</h4>
+  <p><span class="status s2xx">201</span> &mdash; <code>ProductResponse</code> + <code>Location</code> header</p>
+  <p><span class="status s4xx">400</span> &mdash; Validation error</p>
+</div>
+
+<div class="endpoint-box" id="update-product">
+  <h3><span class="method put">PUT</span> <code>/api/products/{id}</code></h3>
+  <p>Full replacement of a product's mutable fields. Does <strong>not</strong> change status.</p>
+  <h4>Request Body</h4>
+  <p><code>Content-Type: application/json</code></p>
+<pre><code>{
+  "name": "Updated Keyboard",         // required, 3-100 chars
+  "description": "New description",    // optional, max 500 chars
+  "price": 159.99,                     // required, positive
+  "stock": 50                          // required, >= 0
+}</code></pre>
+  <h4>Responses</h4>
+  <p><span class="status s2xx">200</span> &mdash; <code>ProductResponse</code></p>
+  <p><span class="status s4xx">400</span> &mdash; Validation error</p>
+  <p><span class="status s4xx">404</span> &mdash; Product not found</p>
+  <p><span class="status s4xx">409</span> &mdash; Optimistic lock conflict (stale version)</p>
+</div>
+
+<div class="endpoint-box" id="patch-product">
+  <h3><span class="method patch">PATCH</span> <code>/api/products/{id}</code></h3>
+  <p>Partial update using <a href="https://www.rfc-editor.org/rfc/rfc7396">JSON Merge Patch (RFC 7396)</a>.
+  Only provided fields are updated; omitted fields are unchanged.</p>
+  <h4>Request Body</h4>
+  <p><code>Content-Type: application/merge-patch+json</code></p>
+<pre><code>{
+  "price": 139.99,    // only update price
+  "stock": 100        // and stock
+}</code></pre>
+  <h4>Responses</h4>
+  <p><span class="status s2xx">200</span> &mdash; <code>ProductResponse</code></p>
+  <p><span class="status s4xx">404</span> &mdash; Product not found</p>
+  <p><span class="status s4xx">409</span> &mdash; Optimistic lock conflict</p>
+  <p><span class="status s4xx">415</span> &mdash; Wrong Content-Type (must be <code>application/merge-patch+json</code>)</p>
+</div>
+
+<div class="endpoint-box" id="delete-product">
+  <h3><span class="method delete">DELETE</span> <code>/api/products/{id}</code></h3>
+  <p>Hard-delete a product.</p>
+  <h4>Responses</h4>
+  <p><span class="status s2xx">204</span> &mdash; No content</p>
+  <p><span class="status s4xx">404</span> &mdash; Product not found</p>
+</div>
+
+<div class="endpoint-box" id="transition-product">
+  <h3><span class="method post">POST</span> <code>/api/products/{id}/status</code></h3>
+  <p>Transition a product's lifecycle status. See <a href="#product-lifecycle">lifecycle rules</a>.</p>
+  <h4>Request Body</h4>
+<pre><code>{
+  "status": "ACTIVE"    // target status
+}</code></pre>
+  <h4>Responses</h4>
+  <p><span class="status s2xx">200</span> &mdash; <code>ProductResponse</code></p>
+  <p><span class="status s4xx">404</span> &mdash; Product not found</p>
+  <p><span class="status s4xx">409</span> &mdash; Invalid status transition</p>
+</div>
+
+<h3 id="product-lifecycle">Product Lifecycle</h3>
+<pre><code>  DRAFT ──→ ACTIVE ──→ DISCONTINUED
+</code></pre>
+<table>
+  <tr><th>From</th><th>To</th><th>Description</th></tr>
+  <tr><td>DRAFT</td><td><span class="transition-arrow">&rarr;</span> ACTIVE</td><td>Publish product for sale</td></tr>
+  <tr><td>ACTIVE</td><td><span class="transition-arrow">&rarr;</span> DISCONTINUED</td><td>End of life</td></tr>
+</table>
+<p>All other transitions are rejected with <span class="status s4xx">409 Conflict</span>.</p>
+
+<hr>
+
+<!-- ============================== ORDERS ============================== -->
+
+<h2>Orders</h2>
+
+<div class="endpoint-box" id="create-order">
+  <h3><span class="method post">POST</span> <code>/api/orders</code></h3>
+  <p>Create a new order. Acquires pessimistic locks on products (sorted by PK to prevent deadlocks),
+  validates stock and product status, snapshots prices, and computes the total.</p>
+  <h4>Headers</h4>
+  <table>
+    <tr><th>Name</th><th>Required</th><th>Description</th></tr>
+    <tr><td><code>Idempotency-Key</code></td><td>Recommended</td><td>Unique key for at-most-once creation. If a matching order exists, it is returned.</td></tr>
+  </table>
+  <h4>Request Body</h4>
+  <p><code>Content-Type: application/json</code></p>
+<pre><code>{
+  "items": [
+    { "productId": 553726781652992, "quantity": 2 },
+    { "productId": 553726781652993, "quantity": 1 }
+  ]
+}</code></pre>
+  <h4>Validation Rules</h4>
+  <ul>
+    <li><code>items</code> must not be empty</li>
+    <li><code>productId</code> is required (not null)</li>
+    <li><code>quantity</code> is required and must be positive</li>
+  </ul>
+  <h4>Business Rules</h4>
+  <ul>
+    <li>Product must exist and not be <code>DISCONTINUED</code> &mdash; otherwise <span class="status s4xx">422</span></li>
+    <li>Product stock must be sufficient &mdash; otherwise <span class="status s4xx">422</span></li>
+    <li>Price is snapshotted at order time (not a live reference)</li>
+    <li>Stock is decremented atomically under pessimistic lock</li>
+  </ul>
+  <h4>Responses</h4>
+  <p><span class="status s2xx">201</span> &mdash; <code>OrderResponse</code> + <code>Location</code> header</p>
+  <p><span class="status s4xx">400</span> &mdash; Validation error</p>
+  <p><span class="status s4xx">404</span> &mdash; Product not found</p>
+  <p><span class="status s4xx">409</span> &mdash; Duplicate idempotency key (returns original order)</p>
+  <p><span class="status s4xx">422</span> &mdash; Discontinued product or insufficient stock</p>
+</div>
+
+<div class="endpoint-box" id="get-order">
+  <h3><span class="method get">GET</span> <code>/api/orders/{id}</code></h3>
+  <p>Get an order with nested line items. Uses JOIN FETCH for N+1 prevention.</p>
+  <h4>Responses</h4>
+  <p><span class="status s2xx">200</span> &mdash; <code>OrderResponse</code></p>
+<pre><code>{
+  "id": 553726781653100,
+  "status": "PLACED",
+  "totalAmount": 319.97,
+  "idempotencyKey": "abc-123",
+  "items": [
+    {
+      "id": 553726781653101,
+      "productId": 553726781652992,
+      "productName": "Ergonomic Keyboard",
+      "quantity": 2,
+      "unitPrice": 149.99
+    }
+  ],
+  "createdAt": "2026-03-01T10:05:00Z",
+  "updatedAt": "2026-03-01T10:05:00Z"
+}</code></pre>
+  <p><span class="status s4xx">404</span> &mdash; Order not found</p>
+</div>
+
+<div class="endpoint-box" id="list-orders">
+  <h3><span class="method get">GET</span> <code>/api/orders</code></h3>
+  <p>List orders with optional filtering and keyset pagination.</p>
+  <h4>Query Parameters</h4>
+  <table>
+    <tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr>
+    <tr><td><code>status</code></td><td>String</td><td>No</td><td>Filter: <code>PLACED</code>, <code>CONFIRMED</code>, <code>SHIPPED</code>, <code>DELIVERED</code>, <code>CANCELLED</code></td></tr>
+    <tr><td><code>afterCreatedAt</code></td><td>Instant</td><td>No</td><td>Keyset cursor: <code>createdAt</code> of last seen order</td></tr>
+    <tr><td><code>afterId</code></td><td>Long</td><td>No</td><td>Keyset cursor: <code>id</code> of last seen order</td></tr>
+    <tr><td><code>limit</code></td><td>Integer</td><td>No</td><td>Max results (default 20)</td></tr>
+  </table>
+  <h4>Response</h4>
+  <p><span class="status s2xx">200</span> &mdash; <code>List&lt;OrderResponse&gt;</code></p>
+</div>
+
+<div class="endpoint-box" id="transition-order">
+  <h3><span class="method post">POST</span> <code>/api/orders/{id}/status</code></h3>
+  <p>Transition an order's lifecycle status. See <a href="#order-lifecycle">lifecycle rules</a>.</p>
+  <h4>Request Body</h4>
+<pre><code>{
+  "status": "CONFIRMED"
+}</code></pre>
+  <h4>Business Rules</h4>
+  <ul>
+    <li>Cancellation (<code>CANCELLED</code>) restores stock to all referenced products</li>
+    <li>Stock restoration uses pessimistic locking (sorted by PK)</li>
+  </ul>
+  <h4>Responses</h4>
+  <p><span class="status s2xx">200</span> &mdash; <code>OrderResponse</code></p>
+  <p><span class="status s4xx">404</span> &mdash; Order not found</p>
+  <p><span class="status s4xx">409</span> &mdash; Invalid status transition</p>
+</div>
+
+<h3 id="order-lifecycle">Order Lifecycle</h3>
+<pre><code>                ┌──→ CANCELLED
+                │
+  PLACED ──→ CONFIRMED ──→ SHIPPED ──→ DELIVERED
+    │                         │
+    └──→ CANCELLED            └──→ (terminal)
+</code></pre>
+<table>
+  <tr><th>From</th><th>To</th><th>Description</th></tr>
+  <tr><td>PLACED</td><td><span class="transition-arrow">&rarr;</span> CONFIRMED</td><td>Seller confirms the order</td></tr>
+  <tr><td>PLACED</td><td><span class="transition-arrow">&rarr;</span> CANCELLED</td><td>Buyer cancels (stock restored)</td></tr>
+  <tr><td>CONFIRMED</td><td><span class="transition-arrow">&rarr;</span> SHIPPED</td><td>Order ships</td></tr>
+  <tr><td>CONFIRMED</td><td><span class="transition-arrow">&rarr;</span> CANCELLED</td><td>Seller cancels (stock restored)</td></tr>
+  <tr><td>SHIPPED</td><td><span class="transition-arrow">&rarr;</span> DELIVERED</td><td>Delivery confirmed</td></tr>
+</table>
+<p>All other transitions are rejected with <span class="status s4xx">409 Conflict</span>.
+<code>DELIVERED</code> and <code>CANCELLED</code> are terminal states.</p>
+
+<hr>
+
+<!-- ============================== REFERENCE ============================== -->
+
+<h2 id="pagination">Keyset Pagination</h2>
+<p>This API uses keyset (cursor-based) pagination instead of offset pagination. This avoids the
+performance degradation of <code>OFFSET</code> on large tables and provides stable results when data changes.</p>
+<h3>How to paginate</h3>
+<ol>
+  <li>Request the first page: <code>GET /api/products?limit=20</code></li>
+  <li>Take the <code>createdAt</code> and <code>id</code> of the <strong>last</strong> item in the response</li>
+  <li>Request the next page: <code>GET /api/products?afterCreatedAt={lastCreatedAt}&amp;afterId={lastId}&amp;limit=20</code></li>
+  <li>Repeat until the response is empty or has fewer items than <code>limit</code></li>
+</ol>
+
+<hr>
+
+<h2 id="idempotency">Idempotency</h2>
+<p>Order creation supports idempotency via the <code>Idempotency-Key</code> header.</p>
+<ul>
+  <li>If an order with the given key already exists, the original order is returned (no duplicate created)</li>
+  <li>The key is stored in the <code>idempotency_key</code> column (unique constraint)</li>
+  <li>Clients should generate a UUID for each unique order intent</li>
+</ul>
+
+<hr>
+
+<h2 id="dtos">Data Transfer Objects</h2>
+
+<h3>ProductCreateRequest</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td><code>name</code></td><td>String</td><td>Required, 3-100 chars</td></tr>
+  <tr><td><code>description</code></td><td>String</td><td>Optional, max 500 chars</td></tr>
+  <tr><td><code>price</code></td><td>BigDecimal</td><td>Required, positive</td></tr>
+  <tr><td><code>stock</code></td><td>Integer</td><td>Required, &ge; 0</td></tr>
+</table>
+
+<h3>ProductUpdateRequest</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td><code>name</code></td><td>String</td><td>Required, 3-100 chars</td></tr>
+  <tr><td><code>description</code></td><td>String</td><td>Optional, max 500 chars</td></tr>
+  <tr><td><code>price</code></td><td>BigDecimal</td><td>Required, positive</td></tr>
+  <tr><td><code>stock</code></td><td>Integer</td><td>Required, &ge; 0</td></tr>
+</table>
+
+<h3>ProductPatchRequest (JSON Merge Patch)</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td><code>name</code></td><td>String</td><td>Optional, 3-100 chars if provided</td></tr>
+  <tr><td><code>description</code></td><td>String</td><td>Optional, max 500 chars if provided</td></tr>
+  <tr><td><code>price</code></td><td>BigDecimal</td><td>Optional, positive if provided</td></tr>
+  <tr><td><code>stock</code></td><td>Integer</td><td>Optional, &ge; 0 if provided</td></tr>
+</table>
+
+<h3>ProductStatusRequest</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td><code>status</code></td><td>ProductStatus</td><td>Required: <code>DRAFT</code>, <code>ACTIVE</code>, <code>DISCONTINUED</code></td></tr>
+</table>
+
+<h3>ProductResponse</h3>
+<table>
+  <tr><th>Field</th><th>Type</th></tr>
+  <tr><td><code>id</code></td><td>Long</td></tr>
+  <tr><td><code>name</code></td><td>String</td></tr>
+  <tr><td><code>description</code></td><td>String (nullable)</td></tr>
+  <tr><td><code>price</code></td><td>BigDecimal</td></tr>
+  <tr><td><code>stock</code></td><td>Integer</td></tr>
+  <tr><td><code>status</code></td><td>String</td></tr>
+  <tr><td><code>createdAt</code></td><td>Instant</td></tr>
+  <tr><td><code>updatedAt</code></td><td>Instant</td></tr>
+</table>
+
+<h3>OrderCreateRequest</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td><code>items</code></td><td>List&lt;OrderLineRequest&gt;</td><td>Required, not empty</td></tr>
+</table>
+
+<h3>OrderLineRequest</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td><code>productId</code></td><td>Long</td><td>Required</td></tr>
+  <tr><td><code>quantity</code></td><td>Integer</td><td>Required, positive</td></tr>
+</table>
+
+<h3>OrderStatusRequest</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td><code>status</code></td><td>OrderStatus</td><td>Required: <code>PLACED</code>, <code>CONFIRMED</code>, <code>SHIPPED</code>, <code>DELIVERED</code>, <code>CANCELLED</code></td></tr>
+</table>
+
+<h3>OrderResponse</h3>
+<table>
+  <tr><th>Field</th><th>Type</th></tr>
+  <tr><td><code>id</code></td><td>Long</td></tr>
+  <tr><td><code>status</code></td><td>String</td></tr>
+  <tr><td><code>totalAmount</code></td><td>BigDecimal</td></tr>
+  <tr><td><code>idempotencyKey</code></td><td>String (nullable)</td></tr>
+  <tr><td><code>items</code></td><td>List&lt;OrderLineResponse&gt;</td></tr>
+  <tr><td><code>createdAt</code></td><td>Instant</td></tr>
+  <tr><td><code>updatedAt</code></td><td>Instant</td></tr>
+</table>
+
+<h3>OrderLineResponse</h3>
+<table>
+  <tr><th>Field</th><th>Type</th></tr>
+  <tr><td><code>id</code></td><td>Long</td></tr>
+  <tr><td><code>productId</code></td><td>Long</td></tr>
+  <tr><td><code>productName</code></td><td>String</td></tr>
+  <tr><td><code>quantity</code></td><td>Integer</td></tr>
+  <tr><td><code>unitPrice</code></td><td>BigDecimal</td></tr>
+</table>
+
+</main>
+</body>
+</html>

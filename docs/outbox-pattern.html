@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Outbox Pattern — Boot4 Reference</title>
+<style>
+  :root {
+    --bg: #fafafa; --fg: #1a1a2e; --accent: #0f3460; --border: #ddd;
+    --code-bg: #f4f4f4; --success: #2e7d32; --warn: #e65100; --err: #c62828;
+    --sidebar-w: 260px; --nav-bg: #1a1a2e; --nav-fg: #e0e0e0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+         color: var(--fg); background: var(--bg); line-height: 1.6; }
+  nav { position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100vh;
+        background: var(--nav-bg); color: var(--nav-fg); overflow-y: auto;
+        padding: 1.5rem 0; z-index: 10; }
+  nav h2 { padding: 0 1rem 1rem; font-size: 1rem; border-bottom: 1px solid #333; margin-bottom: .5rem; }
+  nav .section-label { padding: .5rem 1rem 0; font-size: .7rem; text-transform: uppercase;
+                       letter-spacing: .08em; color: #888; }
+  nav a { display: block; padding: .35rem 1rem; color: var(--nav-fg); text-decoration: none;
+          font-size: .85rem; transition: background .15s; }
+  nav a:hover { background: rgba(255,255,255,.1); }
+  main { margin-left: var(--sidebar-w); padding: 2rem 3rem 4rem; max-width: 900px; }
+  h1 { font-size: 1.8rem; margin-bottom: .5rem; }
+  h2 { font-size: 1.4rem; margin: 2.5rem 0 .75rem; padding-bottom: .3rem;
+       border-bottom: 2px solid var(--accent); }
+  h3 { font-size: 1.15rem; margin: 1.5rem 0 .5rem; }
+  p, li { margin-bottom: .5rem; }
+  ul, ol { padding-left: 1.5rem; }
+  code { background: var(--code-bg); padding: .15em .4em; border-radius: 3px; font-size: .9em; }
+  pre { background: var(--code-bg); padding: 1rem; border-radius: 6px; overflow-x: auto;
+        font-size: .85rem; margin: .75rem 0 1rem; }
+  pre code { background: none; padding: 0; }
+  table { width: 100%; border-collapse: collapse; margin: .75rem 0 1.25rem; font-size: .9rem; }
+  th, td { text-align: left; padding: .5rem .75rem; border: 1px solid var(--border); }
+  th { background: var(--code-bg); font-weight: 600; }
+  .key-points { background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 8px;
+                padding: 1.25rem; margin: 1rem 0 1.5rem; }
+  .key-points h3 { margin-top: 0; color: var(--success); }
+  .callout { border-left: 4px solid var(--accent); background: #eff6ff; padding: 1rem 1.2rem;
+             margin: 1.5rem 0; border-radius: 0 6px 6px 0; }
+  .callout-warn { border-left-color: var(--err); background: #fef2f2; }
+  .callout strong { display: block; margin-bottom: .3rem; }
+  .verdict { font-weight: 700; }
+  .verdict-chosen { color: var(--success); }
+  .verdict-rejected { color: var(--err); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+
+<nav>
+  <h2>Boot4 Reference</h2>
+  <span class="section-label">Outbox Pattern</span>
+  <a href="#key-points">Key Points</a>
+  <a href="#flow-diagram">Flow Diagram</a>
+  <a href="#problem">The Problem</a>
+  <a href="#solution">The Solution</a>
+  <a href="#alternatives">Alternatives Evaluated</a>
+  <a href="#why-not-frameworks">Why Not Frameworks?</a>
+  <a href="#coupling">Why Coupling Is Intentional</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#cloudevents">CloudEvents Format</a>
+  <a href="#sealed-events">Sealed Event Hierarchy</a>
+  <a href="#failure-modes">Failure Modes</a>
+  <a href="#references">References</a>
+  <span class="section-label">Other Docs</span>
+  <a href="spec.html">API Specification</a>
+  <a href="setup.html">Setup Guide</a>
+  <a href="request-lifecycle.html">Request Lifecycle</a>
+  <a href="error-handling.html">Error Handling</a>
+  <a href="testing-strategy.html">Testing Strategy</a>
+  <a href="observability.html">Observability</a>
+</nav>
+
+<main>
+
+<h1>Transactional Outbox Pattern</h1>
+<p>How domain state changes and event publishing stay atomically consistent — no dual writes, no lost events.</p>
+
+<div class="key-points" id="key-points">
+<h3>Key Points</h3>
+<ul>
+  <li>The <strong>dual-write problem</strong>: writing to the DB and publishing to Kafka cannot both succeed atomically without coordination</li>
+  <li>The <strong>outbox solution</strong>: write the event to the same database in the same transaction as the domain change — ACID guarantees atomicity</li>
+  <li>A <strong>SKIP LOCKED poller</strong> reads committed outbox rows and publishes to Kafka (eventually consistent delivery)</li>
+  <li>Events use <strong>CloudEvents 1.0</strong> format via the native Java SDK</li>
+  <li>The event hierarchy is a <strong>sealed interface</strong> — adding a new event type without handling it is a compile error</li>
+</ul>
+</div>
+
+<hr>
+
+<h2 id="flow-diagram">Flow Diagram</h2>
+<pre><code>OrderService                    OutboxPublisher              OutboxPoller
+    |                               |                            |
+    |-- @Transactional -------------|                            |
+    |   orderRepository.save()      |                            |
+    |   outboxPublisher.publish()---|                            |
+    |   |  resolveEventType()       |                            |
+    |   |  buildCloudEventsPayload()|                            |
+    |   |  outboxEventRepo.save()   |                            |
+    |-- COMMIT --------------------|                            |
+    |                               |                            |
+    |                               |        @Scheduled(1s)      |
+    |                               |        findPendingWithLock |
+    |                               |        (SKIP LOCKED)       |
+    |                               |            |               |
+    |                               |        kafkaEventPublisher |
+    |                               |        .publish()          |
+    |                               |        (@Retryable x3)    |
+    |                               |            |               |
+    |                               |        mark PROCESSED      |
+    |                               |        or FAILED(@Recover) |</code></pre>
+
+<hr>
+
+<h2 id="problem">The Problem</h2>
+<p>When an order is created or transitioned, two things must happen atomically:</p>
+<ol>
+  <li>The domain state changes (INSERT/UPDATE in <code>orders</code>, <code>order_lines</code>, <code>products</code>)</li>
+  <li>An event record is written so downstream consumers eventually learn about the change</li>
+</ol>
+<p>Publishing directly to Kafka inside the transaction is a <strong>dual write</strong> — if the Kafka send succeeds but the DB commit fails (or vice versa), the systems diverge. In financial systems where money is involved, this is unacceptable.</p>
+
+<hr>
+
+<h2 id="solution">The Solution: Single-Writer Transactional Outbox</h2>
+<p>Both the domain write and the event write target the <strong>same database</strong> in the <strong>same transaction</strong>. The database — not the application, not a framework, not an in-memory bus — guarantees ACID atomicity.</p>
+
+<pre><code>@Transactional
+public OrderResponse create(OrderCreateRequest request, String idempotencyKey) {
+    // 1. Domain writes: order, order_lines, product stock decrement
+    Order saved = orderRepository.save(order);
+
+    // 2. Outbox write: same transaction, same database
+    outboxPublisher.publish(new DomainEvent.OrderPlaced(
+            saved.getId(), Instant.now(), saved.getTotalAmount(),
+            saved.getOrderLines().size()));
+
+    // 3. Commit: both succeed or both roll back. Zero window of inconsistency.
+    return toResponse(saved);
+}</code></pre>
+
+<p>A separate <code>OutboxPoller</code> (SKIP LOCKED) reads committed outbox rows and publishes to Kafka. This is <strong>eventually consistent</strong> delivery, but the outbox row is <strong>immediately consistent</strong> with the domain state.</p>
+
+<hr>
+
+<h2 id="alternatives">Alternatives Evaluated</h2>
+
+<table>
+<thead>
+<tr><th>Approach</th><th>Crash Safety</th><th>Coupling</th><th>Complexity</th><th>Verdict</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>Explicit outbox insert in same @Transactional</strong> (our approach)</td>
+  <td>JVM crash before commit: both roll back. After commit: both durable. <strong>Zero window.</strong></td>
+  <td>Service knows about OutboxPublisher</td>
+  <td>Low — plain JPA, no extra frameworks</td>
+  <td class="verdict verdict-chosen">CHOSEN</td>
+</tr>
+<tr>
+  <td><strong>Spring Modulith / ApplicationEventPublisher</strong></td>
+  <td>Event published in-memory first, framework persists later. JVM crash between domain commit and event persistence = <strong>event lost</strong></td>
+  <td>Service decoupled — just publishes a Spring event</td>
+  <td>Medium — requires spring-modulith-starter-jdbc</td>
+  <td class="verdict verdict-rejected">REJECTED</td>
+</tr>
+<tr>
+  <td><strong>Spring Integration JDBC Channel</strong></td>
+  <td>Framework persists to JDBC store in same transaction (safe). But message format is Spring Integration-specific, not CloudEvents</td>
+  <td>Service calls a MessagingGateway</td>
+  <td>High — Spring Integration config, custom tables, polling config</td>
+  <td class="verdict verdict-rejected">REJECTED</td>
+</tr>
+<tr>
+  <td><strong>Database trigger on orders table</strong></td>
+  <td>Atomic by definition — trigger fires inside the same transaction</td>
+  <td>Zero Java coupling</td>
+  <td>High — business logic in SQL, hard to test, hard to maintain, event payload construction in PL/pgSQL</td>
+  <td class="verdict verdict-rejected">REJECTED</td>
+</tr>
+<tr>
+  <td><strong>AOP aspect on service methods</strong></td>
+  <td>Same as explicit insert (runs in same transaction)</td>
+  <td>Decoupled — aspect intercepts automatically</td>
+  <td>Medium — but <strong>hides a critical business requirement</strong>. Reading the service method, there's no indication an event must be produced</td>
+  <td class="verdict verdict-rejected">REJECTED</td>
+</tr>
+<tr>
+  <td><strong>Debezium CDC (Change Data Capture)</strong></td>
+  <td>Reads from WAL — only committed rows. <strong>Safe.</strong></td>
+  <td>Zero application coupling — Debezium watches the table</td>
+  <td>High — requires Kafka Connect, Debezium connector, operational overhead</td>
+  <td class="verdict verdict-rejected">REJECTED (for now)</td>
+</tr>
+</tbody>
+</table>
+
+<hr>
+
+<h2 id="why-not-frameworks">Why Not Framework Abstractions?</h2>
+
+<div class="callout callout-warn">
+<strong>The crash test: what happens when the container is killed mid-operation?</strong>
+With our approach, the answer is always the same: if the database committed, both the order and the outbox row are durable. If not, neither exists. There is no in-memory state, no framework queue, no "hope the framework flushes before the kill signal arrives."
+</div>
+
+<p>Framework-based approaches (Spring Modulith, AOP aspects) introduce indirection between the domain operation and the outbox write. This indirection creates a <strong>window of vulnerability</strong>:</p>
+<ul>
+  <li>The domain operation commits</li>
+  <li>The framework <em>intends</em> to persist the event</li>
+  <li>The JVM crashes, the container is killed, the pod is evicted</li>
+  <li>The event is lost</li>
+</ul>
+<p>In a system that processes payments, lost events mean lost money, phantom orders, or customers charged without fulfillment. The explicit same-transaction insert eliminates this window entirely.</p>
+
+<hr>
+
+<h2 id="coupling">Why the Coupling Is Intentional</h2>
+
+<p>"Every order state change MUST produce an event" is a <strong>business requirement</strong>, not a cross-cutting concern. It belongs in the service method, visible to every developer who reads the code, visible in every code review. Making it explicit means:</p>
+<ul>
+  <li>Anyone reading <code>OrderService.create()</code> sees the outbox call and understands: "this operation produces an event"</li>
+  <li>A code reviewer can verify: "yes, every write path includes an outbox publish"</li>
+  <li>Removing the outbox call is a <strong>conscious, reviewable decision</strong> — not an accidental side effect of refactoring an aspect pointcut</li>
+</ul>
+
+<hr>
+
+<h2 id="architecture">Architecture</h2>
+
+<h3>Key Components</h3>
+<ul>
+  <li><strong>OutboxPublisher</strong> (<code>outbox/OutboxPublisher.java</code>) — Builds CloudEvents 1.0 payload (native SDK), inserts into <code>outbox_events</code>. No <code>@Transactional</code> of its own — inherits the caller's transaction</li>
+  <li><strong>OutboxPoller</strong> (<code>outbox/OutboxPoller.java</code>) — <code>@Scheduled</code> every 1 second. <code>SELECT ... FOR UPDATE SKIP LOCKED</code> ensures parallel pollers claim different rows</li>
+  <li><strong>KafkaEventPublisher</strong> (<code>outbox/KafkaEventPublisher.java</code>) — Extracted as separate <code>@Component</code> so <code>@Retryable</code> fires through AOP proxy. <code>@Recover</code> marks events as FAILED after 3 attempts</li>
+  <li><strong>Cleanup job</strong> — Hourly, deletes PROCESSED entries older than 7 days</li>
+</ul>
+
+<h3>SKIP LOCKED Explained</h3>
+<p>The poller query uses <code>SELECT ... FOR UPDATE SKIP LOCKED</code>. This PostgreSQL feature means:</p>
+<ul>
+  <li>Rows locked by another transaction are <strong>skipped</strong>, not blocked on</li>
+  <li>Multiple poller instances can run concurrently without contention</li>
+  <li>If a poller crashes, its locks are released automatically — rows become available on the next poll</li>
+</ul>
+
+<hr>
+
+<h2 id="cloudevents">CloudEvents Format</h2>
+<p>Payloads use the <a href="https://cloudevents.io/">CloudEvents 1.0 specification</a> via the native Java SDK (<code>cloudevents-core</code>). The <code>datacontenttype</code> is <code>application/json</code>.</p>
+<pre><code>{
+  "specversion": "1.0",
+  "id": "a1b2c3d4-...",
+  "source": "/orders/815977570206793968",
+  "type": "Order::placed",
+  "time": "2026-03-01T16:03:32.868Z",
+  "datacontenttype": "application/json",
+  "data": {
+    "orderId": 815977570206793968,
+    "timestamp": "2026-03-01T16:03:32.867Z",
+    "totalAmount": 50.00,
+    "lineCount": 2
+  }
+}</code></pre>
+
+<hr>
+
+<h2 id="sealed-events">Sealed Event Hierarchy</h2>
+<pre><code>public sealed interface DomainEvent {
+    Long orderId();
+    Instant timestamp();
+
+    record OrderPlaced(Long orderId, Instant timestamp,
+                       BigDecimal totalAmount, int lineCount) implements DomainEvent {}
+    record OrderConfirmed(Long orderId, Instant timestamp) implements DomainEvent {}
+    record OrderShipped(Long orderId, Instant timestamp)   implements DomainEvent {}
+    record OrderDelivered(Long orderId, Instant timestamp) implements DomainEvent {}
+    record OrderCancelled(Long orderId, Instant timestamp) implements DomainEvent {}
+}</code></pre>
+<p>The <code>sealed</code> keyword means adding a new event type without handling it in <code>OutboxPublisher.resolveEventType()</code> is a <strong>compile error</strong>. No event can be silently dropped.</p>
+
+<hr>
+
+<h2 id="failure-modes">Failure Modes</h2>
+
+<table>
+<thead><tr><th>Scenario</th><th>Outcome</th></tr></thead>
+<tbody>
+<tr><td>JVM crash before commit</td><td>Both domain write and outbox write roll back. No inconsistency.</td></tr>
+<tr><td>JVM crash after commit</td><td>Both durable. Poller picks up the outbox row on next cycle.</td></tr>
+<tr><td>Kafka down</td><td><code>@Retryable</code> retries 3 times. If still down, <code>@Recover</code> marks FAILED. Outbox row preserved for manual intervention.</td></tr>
+<tr><td>Poller crash mid-batch</td><td>SKIP LOCKED rows revert to PENDING (lock released on disconnect). Next poll picks them up.</td></tr>
+<tr><td>Duplicate delivery</td><td>Possible (at-least-once). Consumers must be idempotent. CloudEvents <code>id</code> field enables deduplication.</td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<h2 id="references">References</h2>
+<ul>
+  <li>Chris Richardson, <a href="https://microservices.io/patterns/data/transactional-outbox.html">Transactional Outbox Pattern</a> — microservices.io</li>
+  <li>Wim Deblauwe, <a href="https://www.wimdeblauwe.com/blog/2024/06/25/transactional-outbox-pattern-with-spring-boot/">Transactional Outbox with Spring Boot</a> (Spring Integration + Spring Modulith approaches)</li>
+  <li>Debezium, <a href="https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/">Reliable Microservices Data Exchange</a> (CDC approach)</li>
+  <li><a href="https://cloudevents.io/">CloudEvents Specification 1.0</a></li>
+  <li><a href="https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html">AWS Prescriptive Guidance: Transactional Outbox</a></li>
+</ul>
+
+</main>
+</body>
+</html>

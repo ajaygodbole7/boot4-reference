@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Error Handling — Boot4 Reference</title>
+<style>
+  :root {
+    --bg: #fafafa; --fg: #1a1a2e; --accent: #0f3460; --border: #ddd;
+    --code-bg: #f4f4f4; --success: #2e7d32; --warn: #e65100; --err: #c62828;
+    --sidebar-w: 260px; --nav-bg: #1a1a2e; --nav-fg: #e0e0e0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+         color: var(--fg); background: var(--bg); line-height: 1.6; }
+  nav { position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100vh;
+        background: var(--nav-bg); color: var(--nav-fg); overflow-y: auto;
+        padding: 1.5rem 0; z-index: 10; }
+  nav h2 { padding: 0 1rem 1rem; font-size: 1rem; border-bottom: 1px solid #333; margin-bottom: .5rem; }
+  nav .section-label { padding: .5rem 1rem 0; font-size: .7rem; text-transform: uppercase;
+                       letter-spacing: .08em; color: #888; }
+  nav a { display: block; padding: .35rem 1rem; color: var(--nav-fg); text-decoration: none;
+          font-size: .85rem; transition: background .15s; }
+  nav a:hover { background: rgba(255,255,255,.1); }
+  main { margin-left: var(--sidebar-w); padding: 2rem 3rem 4rem; max-width: 900px; }
+  h1 { font-size: 1.8rem; margin-bottom: .5rem; }
+  h2 { font-size: 1.4rem; margin: 2.5rem 0 .75rem; padding-bottom: .3rem;
+       border-bottom: 2px solid var(--accent); }
+  h3 { font-size: 1.15rem; margin: 1.5rem 0 .5rem; }
+  p, li { margin-bottom: .5rem; }
+  ul, ol { padding-left: 1.5rem; }
+  code { background: var(--code-bg); padding: .15em .4em; border-radius: 3px; font-size: .9em; }
+  pre { background: var(--code-bg); padding: 1rem; border-radius: 6px; overflow-x: auto;
+        font-size: .85rem; margin: .75rem 0 1rem; }
+  pre code { background: none; padding: 0; }
+  table { width: 100%; border-collapse: collapse; margin: .75rem 0 1.25rem; font-size: .9rem; }
+  th, td { text-align: left; padding: .5rem .75rem; border: 1px solid var(--border); }
+  th { background: var(--code-bg); font-weight: 600; }
+  .key-points { background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 8px;
+                padding: 1.25rem; margin: 1rem 0 1.5rem; }
+  .key-points h3 { margin-top: 0; color: var(--success); }
+  .callout { border-left: 4px solid var(--accent); background: #eff6ff; padding: 1rem 1.2rem;
+             margin: 1.5rem 0; border-radius: 0 6px 6px 0; }
+  .callout-warn { border-left-color: var(--err); background: #fef2f2; }
+  .callout strong { display: block; margin-bottom: .3rem; }
+  .status { font-weight: 600; }
+  .s2xx { color: var(--success); } .s4xx { color: var(--warn); } .s5xx { color: var(--err); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+
+<nav>
+  <h2>Boot4 Reference</h2>
+  <span class="section-label">Error Handling</span>
+  <a href="#key-points">Key Points</a>
+  <a href="#status-map">Exception → Status Map</a>
+  <a href="#problem-details">Problem Details Format</a>
+  <a href="#exception-hierarchy">Exception Hierarchy</a>
+  <a href="#translator-trace">ExceptionTranslator Trace</a>
+  <a href="#dev-vs-prod">Dev vs Prod</a>
+  <a href="#trace-ids">Trace IDs</a>
+  <a href="#adding-exceptions">Adding New Exceptions</a>
+  <span class="section-label">Other Docs</span>
+  <a href="spec.html">API Specification</a>
+  <a href="setup.html">Setup Guide</a>
+  <a href="request-lifecycle.html">Request Lifecycle</a>
+  <a href="testing-strategy.html">Testing Strategy</a>
+  <a href="outbox-pattern.html">Outbox Pattern</a>
+  <a href="observability.html">Observability</a>
+</nav>
+
+<main>
+
+<h1>Error Handling</h1>
+<p>Exceptions → structured JSON via <a href="https://www.rfc-editor.org/rfc/rfc9457">RFC 9457 Problem Details</a>.</p>
+
+<div class="key-points" id="key-points">
+<h3>Key Points</h3>
+<ul>
+  <li>Every error returns <strong>RFC 9457 Problem Details</strong> — structured JSON, not plain text</li>
+  <li>A single <code>ExceptionTranslator</code> (<code>@RestControllerAdvice</code>) handles all exceptions globally</li>
+  <li>Domain exceptions map to specific HTTP statuses; unexpected errors become 500</li>
+  <li>Dev profile includes <code>exception</code> class name and <code>stackTrace</code>; production omits them</li>
+  <li>Every error response includes a <code>timestamp</code> and request metadata for correlation</li>
+</ul>
+</div>
+
+<hr>
+
+<h2 id="status-map">Exception → HTTP Status Map</h2>
+
+<table>
+  <tr><th>Exception</th><th>HTTP Status</th><th>When</th></tr>
+  <tr><td><code>ResourceNotFoundException</code></td><td><span class="status s4xx">404</span> Not Found</td><td>Product or order ID does not exist</td></tr>
+  <tr><td><code>ResourceConflictException</code></td><td><span class="status s4xx">409</span> Conflict</td><td>Invalid status transition (e.g. DRAFT → DISCONTINUED)</td></tr>
+  <tr><td><code>BusinessRuleException</code></td><td><span class="status s4xx">422</span> Unprocessable Entity</td><td>Discontinued product in order, insufficient stock</td></tr>
+  <tr><td><code>ServiceUnavailableException</code></td><td><span class="status s5xx">503</span> Service Unavailable</td><td>Downstream dependency unreachable</td></tr>
+  <tr><td><code>ObjectOptimisticLockingFailureException</code></td><td><span class="status s4xx">409</span> Conflict</td><td>Stale version on PUT/PATCH (concurrent update)</td></tr>
+  <tr><td><code>MethodArgumentNotValidException</code></td><td><span class="status s4xx">400</span> Bad Request</td><td>Bean validation failure (<code>@NotNull</code>, <code>@Positive</code>, etc.)</td></tr>
+  <tr><td><code>HttpMessageNotReadableException</code></td><td><span class="status s4xx">400</span> Bad Request</td><td>Malformed JSON body</td></tr>
+  <tr><td><code>MethodArgumentTypeMismatchException</code></td><td><span class="status s4xx">400</span> Bad Request</td><td>Path/query param type conversion failure</td></tr>
+  <tr><td><code>HttpMediaTypeNotSupportedException</code></td><td><span class="status s4xx">415</span> Unsupported Media Type</td><td>Wrong Content-Type (e.g. PATCH without <code>merge-patch+json</code>)</td></tr>
+  <tr><td><code>HttpRequestMethodNotSupportedException</code></td><td><span class="status s4xx">405</span> Method Not Allowed</td><td>Wrong HTTP method for endpoint</td></tr>
+  <tr><td>Any other <code>Exception</code></td><td><span class="status s5xx">500</span> Internal Server Error</td><td>Unexpected/unhandled errors</td></tr>
+</table>
+
+<hr>
+
+<h2 id="problem-details">Problem Details Format</h2>
+
+<p>Every error response body follows the RFC 9457 structure plus custom extensions:</p>
+
+<pre><code>{
+  "type": "https://api.boot4ref.example.com/errors/404",
+  "title": "Resource Not Found",
+  "status": 404,
+  "detail": "Product not found with id: 553726781652992",
+  "instance": "/api/products/553726781652992",
+  "errorCode": "RESOURCE_NOT_FOUND",
+  "timestamp": "2026-03-01T12:00:00Z",
+  "request": {
+    "httpMethod": "GET",
+    "requestPath": "/api/products/553726781652992"
+  }
+}</code></pre>
+
+<table>
+  <tr><th>Field</th><th>Source</th><th>Purpose</th></tr>
+  <tr><td><code>type</code></td><td>Base URL + status code</td><td>Machine-readable error type URI</td></tr>
+  <tr><td><code>title</code></td><td>HTTP status reason phrase</td><td>Human-readable summary</td></tr>
+  <tr><td><code>status</code></td><td>HTTP status code</td><td>Redundant but useful when body is logged separately</td></tr>
+  <tr><td><code>detail</code></td><td>Exception message</td><td>Specific description of what went wrong</td></tr>
+  <tr><td><code>instance</code></td><td>Request URI</td><td>Which resource was affected</td></tr>
+  <tr><td><code>errorCode</code></td><td>Custom extension</td><td>Application-level code for client error handling</td></tr>
+  <tr><td><code>timestamp</code></td><td>Custom extension</td><td>When the error occurred (ISO-8601 UTC)</td></tr>
+  <tr><td><code>request</code></td><td>Custom extension</td><td>HTTP method + path for log correlation</td></tr>
+</table>
+
+<hr>
+
+<h2 id="exception-hierarchy">Exception Hierarchy</h2>
+
+<pre><code>  RuntimeException
+  ├── ResourceNotFoundException          → 404
+  ├── ResourceConflictException          → 409
+  ├── BusinessRuleException              → 422
+  └── ServiceUnavailableException        → 503
+
+  // Domain-specific subclasses:
+  ResourceNotFoundException
+  ├── ProductNotFoundException
+  └── OrderNotFoundException
+
+  ResourceConflictException
+  ├── ProductConflictException
+  └── OrderConflictException</code></pre>
+
+<p>Domain packages define specific subclasses (e.g., <code>ProductNotFoundException extends ResourceNotFoundException</code>).
+The <code>ExceptionTranslator</code> catches the base types, so subclasses are handled automatically.</p>
+
+<hr>
+
+<h2 id="translator-trace">ExceptionTranslator Code Trace</h2>
+
+<p><strong>File:</strong> <code>common/rest/ExceptionTranslator.java</code></p>
+
+<p><code>@RestControllerAdvice</code> with <code>@Order(Ordered.HIGHEST_PRECEDENCE)</code> — runs before Spring's defaults. Each exception type has a dedicated <code>@ExceptionHandler</code> method.</p>
+
+<p>All handlers delegate to <code>buildErrorResponse()</code>:</p>
+
+<ol>
+  <li>Creates a <code>ProblemDetail</code> instance with status, title, and detail</li>
+  <li>Sets <code>type</code> to <code>https://api.boot4ref.example.com/errors/{status}</code></li>
+  <li>Sets <code>instance</code> to the request URI</li>
+  <li>Adds custom properties: <code>errorCode</code>, <code>timestamp</code>, <code>request</code> metadata</li>
+  <li>In dev profile: adds <code>exception</code> (class name) and <code>stackTrace</code></li>
+  <li>Logs the error at appropriate level (WARN for 4xx, ERROR for 5xx)</li>
+  <li>Returns <code>ResponseEntity&lt;ProblemDetail&gt;</code></li>
+</ol>
+
+<h3>Validation errors get special treatment</h3>
+<p>For <code>MethodArgumentNotValidException</code> (bean validation failures), the translator extracts
+individual field errors and includes them as an <code>errors</code> array in the response:</p>
+
+<pre><code>{
+  "status": 400,
+  "title": "Validation Error",
+  "detail": "Validation failed for object='createProductRequest'. Error count: 2",
+  "errors": [
+    { "field": "name", "message": "size must be between 3 and 100", "rejectedValue": "ab", "errorCode": "Size" },
+    { "field": "price", "message": "must be positive", "rejectedValue": "-1", "errorCode": "Positive" }
+  ]
+}</code></pre>
+
+<hr>
+
+<h2 id="dev-vs-prod">Dev vs Production</h2>
+
+<table>
+  <tr><th>Field</th><th>Dev Profile</th><th>Production</th></tr>
+  <tr><td><code>detail</code></td><td>Full exception message</td><td>Full exception message</td></tr>
+  <tr><td><code>exception</code></td><td>Fully-qualified class name</td><td>Omitted</td></tr>
+  <tr><td><code>stackTrace</code></td><td>Full stack trace string</td><td>Omitted</td></tr>
+</table>
+
+<p>The translator checks <code>env.acceptsProfiles(Profiles.of("dev"))</code>. Dev gets stack traces for debugging. Production doesn't leak internals.</p>
+
+<hr>
+
+<h2 id="trace-ids">Trace IDs and Observability</h2>
+
+<p>With the observability stack running (OTel Collector + Grafana), every request gets a trace ID via MDC. Error log entries include this trace ID, so:</p>
+
+<ol>
+  <li>See the error in application logs (Loki)</li>
+  <li>Click the trace ID to jump to the full distributed trace (Tempo)</li>
+  <li>See request latency and error rate metrics (Prometheus)</li>
+</ol>
+
+<p>The MDC pattern <code>%X{traceId}</code> puts trace IDs in every log line. See <a href="observability.html">Observability</a> for the full pipeline.</p>
+
+<hr>
+
+<h2 id="adding-exceptions">Adding New Exceptions</h2>
+
+<ol>
+  <li>Create the exception class in the appropriate domain <code>exception/</code> package, extending one of the base types (<code>ResourceNotFoundException</code>, <code>ResourceConflictException</code>, <code>BusinessRuleException</code>)</li>
+  <li>Throw it from the service layer</li>
+  <li>That's it — <code>ExceptionTranslator</code> already handles the base type</li>
+</ol>
+
+<p>For a <strong>new base exception type</strong> with a different HTTP status:</p>
+<ol>
+  <li>Create the exception in <code>common/exception/</code></li>
+  <li>Add an <code>@ExceptionHandler</code> method in <code>ExceptionTranslator</code></li>
+  <li>Add tests in <code>ExceptionTranslatorTest</code></li>
+</ol>
+
+</main>
+</body>
+</html>

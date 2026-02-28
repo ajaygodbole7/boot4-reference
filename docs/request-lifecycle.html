@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Request Lifecycle — Boot4 Reference</title>
+<style>
+  :root {
+    --bg: #fafafa; --fg: #1a1a2e; --accent: #0f3460; --border: #ddd;
+    --code-bg: #f4f4f4; --success: #2e7d32; --warn: #e65100; --err: #c62828;
+    --sidebar-w: 260px; --nav-bg: #1a1a2e; --nav-fg: #e0e0e0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+         color: var(--fg); background: var(--bg); line-height: 1.6; }
+  nav { position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100vh;
+        background: var(--nav-bg); color: var(--nav-fg); overflow-y: auto;
+        padding: 1.5rem 0; z-index: 10; }
+  nav h2 { padding: 0 1rem 1rem; font-size: 1rem; border-bottom: 1px solid #333; margin-bottom: .5rem; }
+  nav .section-label { padding: .5rem 1rem 0; font-size: .7rem; text-transform: uppercase;
+                       letter-spacing: .08em; color: #888; }
+  nav a { display: block; padding: .35rem 1rem; color: var(--nav-fg); text-decoration: none;
+          font-size: .85rem; transition: background .15s; }
+  nav a:hover { background: rgba(255,255,255,.1); }
+  main { margin-left: var(--sidebar-w); padding: 2rem 3rem 4rem; max-width: 900px; }
+  h1 { font-size: 1.8rem; margin-bottom: .5rem; }
+  h2 { font-size: 1.4rem; margin: 2.5rem 0 .75rem; padding-bottom: .3rem;
+       border-bottom: 2px solid var(--accent); }
+  h3 { font-size: 1.15rem; margin: 1.5rem 0 .5rem; }
+  p, li { margin-bottom: .5rem; }
+  ul, ol { padding-left: 1.5rem; }
+  code { background: var(--code-bg); padding: .15em .4em; border-radius: 3px; font-size: .9em; }
+  pre { background: var(--code-bg); padding: 1rem; border-radius: 6px; overflow-x: auto;
+        font-size: .85rem; margin: .75rem 0 1rem; }
+  pre code { background: none; padding: 0; }
+  table { width: 100%; border-collapse: collapse; margin: .75rem 0 1.25rem; font-size: .9rem; }
+  th, td { text-align: left; padding: .5rem .75rem; border: 1px solid var(--border); }
+  th { background: var(--code-bg); font-weight: 600; }
+  .key-points { background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 8px;
+                padding: 1.25rem; margin: 1rem 0 1.5rem; }
+  .key-points h3 { margin-top: 0; color: var(--success); }
+  .callout { border-left: 4px solid var(--accent); background: #eff6ff; padding: 1rem 1.2rem;
+             margin: 1.5rem 0; border-radius: 0 6px 6px 0; }
+  .callout strong { display: block; margin-bottom: .3rem; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  .layer-tag { display: inline-block; padding: .15em .5em; border-radius: 3px;
+               font-weight: 700; font-size: .8rem; color: #fff; margin-right: .3rem; }
+  .layer-http { background: #1565c0; }
+  .layer-service { background: #6a1b9a; }
+  .layer-repo { background: var(--success); }
+  .layer-db { background: var(--warn); }
+</style>
+</head>
+<body>
+
+<nav>
+  <h2>Boot4 Reference</h2>
+  <span class="section-label">Request Lifecycle</span>
+  <a href="#key-points">Key Points</a>
+  <a href="#flow-diagram">Flow Diagram</a>
+  <a href="#trace-create-order">Trace: POST /api/orders</a>
+  <a href="#step-controller">1. Controller</a>
+  <a href="#step-service">2. Service</a>
+  <a href="#step-locking">3. Pessimistic Locking</a>
+  <a href="#step-validation">4. Business Validation</a>
+  <a href="#step-persist">5. Persist &amp; Outbox</a>
+  <a href="#step-response">6. Response</a>
+  <a href="#patterns">Patterns Used</a>
+  <span class="section-label">Other Docs</span>
+  <a href="spec.html">API Specification</a>
+  <a href="setup.html">Setup Guide</a>
+  <a href="error-handling.html">Error Handling</a>
+  <a href="testing-strategy.html">Testing Strategy</a>
+  <a href="outbox-pattern.html">Outbox Pattern</a>
+  <a href="observability.html">Observability</a>
+</nav>
+
+<main>
+
+<h1>Request Lifecycle</h1>
+<p>An HTTP request traced through every layer, from dispatch to database commit.</p>
+
+<div class="key-points" id="key-points">
+<h3>Key Points</h3>
+<ul>
+  <li>Every request follows: <strong>Controller → Service → Repository → Database → Response</strong></li>
+  <li>Controllers implement an <strong>Api interface</strong> (annotations) and delegate all logic to the service</li>
+  <li>Services own <code>@Transactional</code> boundaries — controllers never manage transactions</li>
+  <li>Bean validation fires automatically on <code>@Valid</code> request bodies before the controller method executes</li>
+  <li>Any exception is caught by <code>ExceptionTranslator</code> and converted to RFC 9457 Problem Details</li>
+</ul>
+</div>
+
+<hr>
+
+<h2 id="flow-diagram">Flow Diagram</h2>
+<pre><code>  Client
+    │
+    ▼
+  DispatcherServlet
+    │
+    ├─ Bean Validation (@Valid)          ──→ 400 if invalid
+    │
+    ▼
+  OrderController (implements OrderApi)
+    │
+    ▼
+  OrderService (@Transactional)
+    │
+    ├─ Idempotency check                ──→ 200 if duplicate key
+    ├─ Lock products (SELECT FOR UPDATE, sorted by PK)
+    ├─ Validate: product active? stock sufficient?  ──→ 422 if violated
+    ├─ Decrement stock, snapshot prices
+    ├─ Save order + order lines
+    ├─ OutboxPublisher.publish()         ──→ same transaction
+    │
+    ▼
+  COMMIT (order + stock + outbox = atomic)
+    │
+    ▼
+  OrderController builds 201 + Location header
+    │
+    ▼
+  Client receives OrderResponse</code></pre>
+
+<hr>
+
+<h2 id="trace-create-order">Deep Dive: Tracing POST /api/orders</h2>
+
+<p>Order creation is the most complex request in the system. It hits every pattern: validation, locking, stock management, outbox events, idempotency.</p>
+
+<h3 id="step-controller"><span class="layer-tag layer-http">HTTP</span> 1. Controller Layer</h3>
+
+<p><strong>File:</strong> <code>order/rest/OrderController.java</code></p>
+
+<p><code>OrderController.createOrder()</code> implements <code>OrderApi</code> (endpoint mappings + OpenAPI annotations). Zero business logic here:</p>
+
+<pre><code>@Override
+public ResponseEntity&lt;OrderResponse&gt; createOrder(
+        @Nullable String idempotencyKey,
+        OrderCreateRequest request) {
+    OrderResponse created = orderService.create(request, idempotencyKey);
+    URI location = URI.create("/api/orders/" + created.id());
+    return ResponseEntity.created(location).body(created);
+}</code></pre>
+
+<p>Spring's <code>DispatcherServlet</code> has already:</p>
+<ul>
+  <li>Deserialized the JSON body into <code>OrderCreateRequest</code> (Jackson 3)</li>
+  <li>Run <code>@Valid</code> bean validation — if <code>items</code> is empty or <code>quantity</code> is null, a <code>MethodArgumentNotValidException</code> is thrown and caught by <code>ExceptionTranslator</code> → 400</li>
+  <li>Extracted the <code>Idempotency-Key</code> header into the <code>idempotencyKey</code> parameter</li>
+</ul>
+
+<h3 id="step-service"><span class="layer-tag layer-service">SERVICE</span> 2. Service Layer</h3>
+
+<p><strong>File:</strong> <code>order/service/OrderService.java</code></p>
+
+<p>The <code>create()</code> method is <code>@Transactional</code>. Everything from here until the method returns is a single database transaction.</p>
+
+<p>First, the <strong>idempotency check</strong>: if a non-null <code>idempotencyKey</code> was provided and an order already exists with that key, the existing order is returned immediately. No duplicate is created.</p>
+
+<h3 id="step-locking"><span class="layer-tag layer-repo">REPO</span> 3. Pessimistic Locking</h3>
+
+<p><strong>File:</strong> <code>product/repository/ProductRepository.java</code></p>
+
+<p>Product IDs from the request are <strong>sorted</strong> before locking. This prevents deadlocks when concurrent
+orders reference the same products in different order.</p>
+
+<pre><code>SELECT p FROM Product p WHERE p.id IN :ids ORDER BY p.id
+-- with @Lock(LockModeType.PESSIMISTIC_WRITE)</code></pre>
+
+<p>The <code>SELECT ... FOR UPDATE</code> blocks other transactions from modifying these rows until our transaction commits.</p>
+
+<h3 id="step-validation"><span class="layer-tag layer-service">SERVICE</span> 4. Business Validation</h3>
+
+<p>With locks held, the service validates each line item:</p>
+<ul>
+  <li>Product must exist (otherwise <code>ProductNotFoundException</code> → 404)</li>
+  <li>Product must not be <code>DISCONTINUED</code> (otherwise <code>BusinessRuleException</code> → 422)</li>
+  <li>Product stock must be &ge; requested quantity (otherwise <code>BusinessRuleException</code> → 422)</li>
+</ul>
+
+<p>These checks happen <em>after</em> locking. Without the lock, another transaction could decrement stock or discontinue the product between request arrival and validation.</p>
+
+<h3 id="step-persist"><span class="layer-tag layer-db">DB</span> 5. Persist &amp; Outbox</h3>
+
+<p>If all validations pass:</p>
+<ol>
+  <li><strong>Stock decrement:</strong> each product's stock is reduced by the ordered quantity</li>
+  <li><strong>Price snapshot:</strong> the current product price is captured on each <code>OrderLine</code> — prices are not live references</li>
+  <li><strong>Total computed:</strong> sum of (quantity &times; unit price) for all lines</li>
+  <li><strong>Order saved:</strong> <code>orderRepository.save(order)</code> cascades to order lines (<code>CascadeType.ALL</code>)</li>
+  <li><strong>Outbox event:</strong> <code>outboxPublisher.publish(new DomainEvent.OrderPlaced(...))</code> inserts a CloudEvents-formatted row into <code>outbox_events</code> — <strong>in the same transaction</strong></li>
+</ol>
+
+<div class="callout">
+<strong>Why same-transaction outbox?</strong>
+If the commit succeeds, both the order and the event are durable. If it fails, neither exists.
+This eliminates the dual-write problem. See <a href="outbox-pattern.html">Outbox Pattern</a> for the full design rationale.
+</div>
+
+<h3 id="step-response"><span class="layer-tag layer-http">HTTP</span> 6. Response</h3>
+
+<p>Back in the controller, the <code>OrderResponse</code> record is wrapped in a <code>201 Created</code> response with a
+<code>Location: /api/orders/{id}</code> header. Jackson 3 serializes the record to JSON.</p>
+
+<p>On any exception, <code>ExceptionTranslator</code> catches it, returns RFC 9457 Problem Details, and the <code>@Transactional</code> proxy rolls back.</p>
+
+<hr>
+
+<h2 id="patterns">Patterns Used in This Flow</h2>
+
+<table>
+  <tr><th>Pattern</th><th>Where</th><th>Why</th></tr>
+  <tr><td>Interface/Implementation split</td><td><code>OrderApi</code> / <code>OrderController</code></td><td>Separates OpenAPI annotations from HTTP logic</td></tr>
+  <tr><td>Thin controller, fat service</td><td><code>OrderController</code> → <code>OrderService</code></td><td>Controllers do HTTP mapping only; services own business logic</td></tr>
+  <tr><td>Pessimistic locking (sorted)</td><td><code>ProductRepository.findWithLockById()</code></td><td>Prevents deadlocks + ensures stock correctness</td></tr>
+  <tr><td>Idempotency key</td><td><code>OrderService.create()</code></td><td>At-most-once order creation</td></tr>
+  <tr><td>Transactional outbox</td><td><code>OutboxPublisher.publish()</code></td><td>ACID-safe event publishing</td></tr>
+  <tr><td>Price snapshotting</td><td><code>OrderLine.unitPrice</code></td><td>Order total doesn't change if product price changes later</td></tr>
+  <tr><td>Cascade + orphan removal</td><td><code>Order.orderLines</code></td><td>Parent manages child lifecycle</td></tr>
+  <tr><td>Global exception translation</td><td><code>ExceptionTranslator</code></td><td>Consistent RFC 9457 error responses</td></tr>
+</table>
+
+</main>
+</body>
+</html>
