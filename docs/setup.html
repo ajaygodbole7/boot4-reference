@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Setup Guide — Boot4 Reference</title>
+<style>
+  :root {
+    --bg: #fafafa; --fg: #1a1a2e; --accent: #0f3460; --border: #ddd;
+    --code-bg: #f4f4f4; --success: #2e7d32; --warn: #e65100; --err: #c62828;
+    --sidebar-w: 260px; --nav-bg: #1a1a2e; --nav-fg: #e0e0e0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+         color: var(--fg); background: var(--bg); line-height: 1.6; }
+  nav { position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100vh;
+        background: var(--nav-bg); color: var(--nav-fg); overflow-y: auto;
+        padding: 1.5rem 0; z-index: 10; }
+  nav h2 { padding: 0 1rem 1rem; font-size: 1rem; border-bottom: 1px solid #333; margin-bottom: .5rem; }
+  nav .section-label { padding: .5rem 1rem 0; font-size: .7rem; text-transform: uppercase;
+                       letter-spacing: .08em; color: #888; }
+  nav a { display: block; padding: .35rem 1rem; color: var(--nav-fg); text-decoration: none;
+          font-size: .85rem; transition: background .15s; }
+  nav a:hover { background: rgba(255,255,255,.1); }
+  main { margin-left: var(--sidebar-w); padding: 2rem 3rem 4rem; max-width: 900px; }
+  h1 { font-size: 1.8rem; margin-bottom: .5rem; }
+  h2 { font-size: 1.4rem; margin: 2.5rem 0 .75rem; padding-bottom: .3rem;
+       border-bottom: 2px solid var(--accent); }
+  h3 { font-size: 1.15rem; margin: 1.5rem 0 .5rem; }
+  p, li { margin-bottom: .5rem; }
+  ul, ol { padding-left: 1.5rem; }
+  code { background: var(--code-bg); padding: .15em .4em; border-radius: 3px; font-size: .9em; }
+  pre { background: var(--code-bg); padding: 1rem; border-radius: 6px; overflow-x: auto;
+        font-size: .85rem; margin: .75rem 0 1rem; }
+  pre code { background: none; padding: 0; }
+  table { width: 100%; border-collapse: collapse; margin: .75rem 0 1.25rem; font-size: .9rem; }
+  th, td { text-align: left; padding: .5rem .75rem; border: 1px solid var(--border); }
+  th { background: var(--code-bg); font-weight: 600; }
+  .key-points { background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 8px;
+                padding: 1.25rem; margin: 1rem 0 1.5rem; }
+  .key-points h3 { margin-top: 0; color: var(--success); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+
+<nav>
+  <h2>Boot4 Reference</h2>
+  <span class="section-label">Setup Guide</span>
+  <a href="#key-points">Key Points</a>
+  <a href="#quick-start">Quick Start</a>
+  <a href="#prerequisites">Prerequisites</a>
+  <a href="#ide-setup">IDE Setup</a>
+  <a href="#docker-stack">Docker Stack</a>
+  <a href="#profiles">Profiles</a>
+  <a href="#environment">Environment Variables</a>
+  <span class="section-label">Other Docs</span>
+  <a href="spec.html">API Specification</a>
+  <a href="request-lifecycle.html">Request Lifecycle</a>
+  <a href="error-handling.html">Error Handling</a>
+  <a href="testing-strategy.html">Testing Strategy</a>
+  <a href="outbox-pattern.html">Outbox Pattern</a>
+  <a href="observability.html">Observability</a>
+</nav>
+
+<main>
+
+<h1>Setup Guide</h1>
+<p>Build, run, and develop against boot4-reference.</p>
+
+<div class="key-points" id="key-points">
+<h3>Key Points</h3>
+<ul>
+  <li><strong>Java 25</strong> (Eclipse Temurin) + <strong>Maven 3.9+</strong> are required</li>
+  <li><strong>PostgreSQL</strong> is needed for runtime; tests use Testcontainers automatically</li>
+  <li><code>mvn verify</code> builds and runs all tests (unit + integration) — no external DB needed</li>
+  <li>The <code>infra/</code> directory has a full Compose stack (Docker or Podman): Postgres, Kafka, Grafana, Prometheus, Tempo, Loki</li>
+  <li>The app runs on port <strong>8080</strong> (API) and <strong>8081</strong> (management/metrics)</li>
+</ul>
+</div>
+
+<hr>
+
+<h2 id="quick-start">Quick Start</h2>
+<ol>
+  <li>Install Java 25 and Maven 3.9+</li>
+  <li>Run <code>mvn verify</code> — this compiles, runs unit tests (Surefire), starts Testcontainers for PostgreSQL, runs integration tests (Failsafe)</li>
+  <li>Start the infra stack: <code>cd infra && ./start.sh</code></li>
+  <li>Run the app: <code>mvn spring-boot:run</code></li>
+  <li>Hit the API: <code>curl http://localhost:8080/api/products</code></li>
+</ol>
+
+<hr>
+
+<h2 id="prerequisites">Prerequisites</h2>
+
+<table>
+  <tr><th>Tool</th><th>Version</th><th>Notes</th></tr>
+  <tr><td>Java</td><td>25</td><td>Eclipse Temurin recommended. <code>java --version</code> to verify.</td></tr>
+  <tr><td>Maven</td><td>3.9+</td><td>The Maven wrapper (<code>./mvnw</code>) is not included; install Maven directly.</td></tr>
+  <tr><td>Docker or Podman</td><td>Docker 24+ / Podman 4+</td><td>Required for the infrastructure stack and Testcontainers. <code>infra/start.sh</code> auto-detects which runtime is available.</td></tr>
+  <tr><td>Compose</td><td>v2+</td><td><code>docker compose</code> (bundled with Docker) or <code>podman compose</code> (<code>pip install podman-compose</code>).</td></tr>
+  <tr><td>PostgreSQL</td><td>16</td><td>Only needed if running the app outside containers. Tests use Testcontainers.</td></tr>
+</table>
+
+<hr>
+
+<h2 id="ide-setup">IDE Setup</h2>
+
+<h3>IntelliJ IDEA</h3>
+<ol>
+  <li>Open as Maven project (File → Open → select <code>pom.xml</code>)</li>
+  <li>Set Project SDK to Java 25</li>
+  <li>Enable annotation processing (Settings → Build → Compiler → Annotation Processors) for Lombok</li>
+  <li>Install the Lombok plugin if not already installed</li>
+  <li>Mark <code>src/main/java</code> as Sources Root and <code>src/test/java</code> as Test Sources Root (should auto-detect)</li>
+</ol>
+
+<h3>VS Code</h3>
+<ol>
+  <li>Install "Extension Pack for Java" (includes Maven, debugger, test runner)</li>
+  <li>Install "Lombok Annotations Support"</li>
+  <li>Open the project root folder</li>
+</ol>
+
+<hr>
+
+<h2 id="docker-stack">Docker Stack</h2>
+
+<p>The <code>infra/</code> directory contains a complete observability stack:</p>
+
+<table>
+  <tr><th>Service</th><th>Image</th><th>Port</th><th>Purpose</th></tr>
+  <tr><td>PostgreSQL</td><td><code>postgres:16-alpine</code></td><td>5432</td><td>Application database</td></tr>
+  <tr><td>Kafka</td><td><code>apache/kafka-native:4.2.0</code></td><td>9092</td><td>Event messaging (KRaft, ~52 MB)</td></tr>
+  <tr><td>OTel Collector</td><td><code>otel/opentelemetry-collector-contrib</code></td><td>4318</td><td>Receives OTLP traces + metrics</td></tr>
+  <tr><td>Prometheus</td><td><code>prom/prometheus</code></td><td>9090</td><td>Metrics storage + queries</td></tr>
+  <tr><td>Tempo</td><td><code>grafana/tempo</code></td><td>3200</td><td>Distributed trace storage</td></tr>
+  <tr><td>Loki</td><td><code>grafana/loki</code></td><td>3100</td><td>Log aggregation</td></tr>
+  <tr><td>Grafana</td><td><code>grafana/grafana</code></td><td>3000</td><td>Dashboards (auto-provisioned)</td></tr>
+</table>
+
+<pre><code># Start everything
+cd infra && ./start.sh
+
+# Stop everything
+cd infra && ./stop.sh
+
+# View logs
+docker compose -f infra/docker-compose.yml logs -f</code></pre>
+
+<p>Grafana is available at <code>http://localhost:3000</code> with pre-provisioned dashboards and datasources.</p>
+
+<hr>
+
+<h2 id="profiles">Profiles</h2>
+
+<h3>Spring Profiles</h3>
+<table>
+  <tr><th>Profile</th><th>Purpose</th><th>Activate</th></tr>
+  <tr><td><code>dev</code></td><td>Enables DevDataSeeder (Faker fixtures), verbose error details in responses</td><td><code>-Dspring-boot.run.profiles=dev</code></td></tr>
+  <tr><td><code>test</code></td><td>Activated by <code>@ActiveProfiles("test")</code> in <code>AbstractIntegrationTest</code>. Testcontainers provides PostgreSQL.</td><td><code>@ActiveProfiles("test")</code></td></tr>
+  <tr><td>(default)</td><td>Production-like. No dev data, no stack traces in errors.</td><td>No profile flag</td></tr>
+</table>
+
+<h3>Maven Profiles</h3>
+<table>
+  <tr><th>Profile</th><th>Purpose</th><th>Activate</th></tr>
+  <tr><td><code>aot</code></td><td>AOT-processed build for faster startup</td><td><code>mvn package -Paot</code></td></tr>
+  <tr><td><code>native</code></td><td>GraalVM native image (requires GraalVM JDK)</td><td><code>mvn package -Pnative</code></td></tr>
+</table>
+
+<hr>
+
+<h2 id="environment">Environment Variables</h2>
+
+<p>These override <code>application.properties</code> defaults when running in Docker or CI:</p>
+
+<table>
+  <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+  <tr><td><code>SPRING_DATASOURCE_URL</code></td><td><code>jdbc:postgresql://localhost:5432/boot4refdb</code></td><td>PostgreSQL JDBC URL</td></tr>
+  <tr><td><code>SPRING_DATASOURCE_USERNAME</code></td><td><code>boot4user</code></td><td>Database username</td></tr>
+  <tr><td><code>SPRING_DATASOURCE_PASSWORD</code></td><td><code>boot4pass</code></td><td>Database password</td></tr>
+  <tr><td><code>KAFKA_BOOTSTRAP_SERVERS</code></td><td><code>localhost:9092</code></td><td>Kafka broker address</td></tr>
+  <tr><td><code>MANAGEMENT_OTLP_TRACING_ENDPOINT</code></td><td><code>http://localhost:4318/v1/traces</code></td><td>OTLP trace endpoint (OTel Collector)</td></tr>
+  <tr><td><code>STRUCTURED_LOGGING</code></td><td>(unset)</td><td>Set to <code>true</code> for ECS JSON console logging</td></tr>
+</table>
+
+</main>
+</body>
+</html>

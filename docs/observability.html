@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Observability — Boot4 Reference</title>
+<style>
+  :root {
+    --bg: #fafafa; --fg: #1a1a2e; --accent: #0f3460; --border: #ddd;
+    --code-bg: #f4f4f4; --success: #2e7d32; --warn: #e65100; --err: #c62828;
+    --sidebar-w: 260px; --nav-bg: #1a1a2e; --nav-fg: #e0e0e0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+         color: var(--fg); background: var(--bg); line-height: 1.6; }
+  nav { position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100vh;
+        background: var(--nav-bg); color: var(--nav-fg); overflow-y: auto;
+        padding: 1.5rem 0; z-index: 10; }
+  nav h2 { padding: 0 1rem 1rem; font-size: 1rem; border-bottom: 1px solid #333; margin-bottom: .5rem; }
+  nav .section-label { padding: .5rem 1rem 0; font-size: .7rem; text-transform: uppercase;
+                       letter-spacing: .08em; color: #888; }
+  nav a { display: block; padding: .35rem 1rem; color: var(--nav-fg); text-decoration: none;
+          font-size: .85rem; transition: background .15s; }
+  nav a:hover { background: rgba(255,255,255,.1); }
+  main { margin-left: var(--sidebar-w); padding: 2rem 3rem 4rem; max-width: 900px; }
+  h1 { font-size: 1.8rem; margin-bottom: .5rem; }
+  h2 { font-size: 1.4rem; margin: 2.5rem 0 .75rem; padding-bottom: .3rem;
+       border-bottom: 2px solid var(--accent); }
+  h3 { font-size: 1.15rem; margin: 1.5rem 0 .5rem; }
+  p, li { margin-bottom: .5rem; }
+  ul, ol { padding-left: 1.5rem; }
+  code { background: var(--code-bg); padding: .15em .4em; border-radius: 3px; font-size: .9em; }
+  pre { background: var(--code-bg); padding: 1rem; border-radius: 6px; overflow-x: auto;
+        font-size: .85rem; margin: .75rem 0 1rem; }
+  pre code { background: none; padding: 0; }
+  table { width: 100%; border-collapse: collapse; margin: .75rem 0 1.25rem; font-size: .9rem; }
+  th, td { text-align: left; padding: .5rem .75rem; border: 1px solid var(--border); }
+  th { background: var(--code-bg); font-weight: 600; }
+  .key-points { background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 8px;
+                padding: 1.25rem; margin: 1rem 0 1.5rem; }
+  .key-points h3 { margin-top: 0; color: var(--success); }
+  .callout { border-left: 4px solid var(--accent); background: #eff6ff; padding: 1rem 1.2rem;
+             margin: 1.5rem 0; border-radius: 0 6px 6px 0; }
+  .callout strong { display: block; margin-bottom: .3rem; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+
+<nav>
+  <h2>Boot4 Reference</h2>
+  <span class="section-label">Observability</span>
+  <a href="#key-points">Key Points</a>
+  <a href="#find-in-grafana">How to Find X in Grafana</a>
+  <a href="#pipeline">Pipeline Overview</a>
+  <a href="#logging">Structured Logging</a>
+  <a href="#tracing">Distributed Tracing</a>
+  <a href="#metrics">Metrics</a>
+  <a href="#correlation">Correlation IDs</a>
+  <a href="#dashboards">Grafana Dashboards</a>
+  <a href="#stack">Infrastructure Stack</a>
+  <span class="section-label">Other Docs</span>
+  <a href="spec.html">API Specification</a>
+  <a href="setup.html">Setup Guide</a>
+  <a href="request-lifecycle.html">Request Lifecycle</a>
+  <a href="error-handling.html">Error Handling</a>
+  <a href="testing-strategy.html">Testing Strategy</a>
+  <a href="outbox-pattern.html">Outbox Pattern</a>
+</nav>
+
+<main>
+
+<h1>Observability</h1>
+<p>Logs, traces, metrics — OpenTelemetry to Grafana.</p>
+
+<div class="key-points" id="key-points">
+<h3>Key Points</h3>
+<ul>
+  <li><strong>Three pillars:</strong> logs (Loki), traces (Tempo), metrics (Prometheus) — all accessible from Grafana at <code>localhost:3000</code></li>
+  <li><strong>OpenTelemetry Collector</strong> receives OTLP traces from the app and exports to Tempo and Prometheus</li>
+  <li><strong>Structured logging</strong> uses ECS JSON format when <code>STRUCTURED_LOGGING=true</code> (in Docker); default console format for local dev</li>
+  <li><strong>MDC correlation IDs</strong> (<code>traceId</code>, <code>spanId</code>) in every log line — click through to traces in Tempo</li>
+  <li>Actuator exposes <code>/actuator/prometheus</code> on management port <strong>8081</strong> — separate from the API port</li>
+</ul>
+</div>
+
+<hr>
+
+<h2 id="find-in-grafana">How to Find X in Grafana</h2>
+
+<table>
+  <tr><th>I want to find...</th><th>Where in Grafana</th><th>How</th></tr>
+  <tr><td>Errors in the last hour</td><td>Explore → Loki</td><td>Query: <code>{job="boot4-reference"} |= "ERROR"</code></td></tr>
+  <tr><td>Slow requests (&gt;500ms)</td><td>Explore → Tempo</td><td>Search by duration &gt; 500ms, or check HTTP latency dashboard panel</td></tr>
+  <tr><td>A specific request's full trace</td><td>Explore → Tempo</td><td>Paste the <code>traceId</code> from the log line</td></tr>
+  <tr><td>Failed outbox events</td><td>Explore → Loki</td><td>Query: <code>{job="boot4-reference"} |= "FAILED"</code></td></tr>
+  <tr><td>HTTP request rate</td><td>Dashboards → Boot4 Reference</td><td>Panel: "Request Rate" — shows requests/second by endpoint</td></tr>
+  <tr><td>Error rate by endpoint</td><td>Dashboards → Boot4 Reference</td><td>Panel: "Error Rate" — 4xx and 5xx per endpoint</td></tr>
+  <tr><td>JVM memory usage</td><td>Dashboards → JVM</td><td>Heap used, GC pauses, thread count</td></tr>
+  <tr><td>Database connection pool</td><td>Dashboards → Boot4 Reference</td><td>Panel: "HikariCP" — active, idle, pending connections</td></tr>
+</table>
+
+<hr>
+
+<h2 id="pipeline">Pipeline Overview</h2>
+
+<pre><code>  Spring Boot App (port 8080)
+    │
+    ├── OTLP traces ──→ OTel Collector (port 4318) ──→ Tempo (port 3200)
+    │                           │
+    │                           └──→ Prometheus (port 9090) ←── scrape /actuator/prometheus (port 8081)
+    │
+    ├── Structured logs (stdout) ──→ Docker logs ──→ Loki (port 3100)
+    │
+    └── Actuator metrics ──→ Prometheus scrape ──→ Grafana (port 3000)
+                                                        │
+                                                        ├── Tempo datasource (traces)
+                                                        ├── Loki datasource (logs)
+                                                        └── Prometheus datasource (metrics)</code></pre>
+
+<hr>
+
+<h2 id="logging">Deep Dive: Structured Logging</h2>
+
+<h3>Configuration</h3>
+<p><strong>File:</strong> <code>src/main/resources/application.properties</code></p>
+
+<p>Logging format is controlled by the <code>STRUCTURED_LOGGING</code> environment variable:</p>
+
+<table>
+  <tr><th>Environment</th><th>Format</th><th>Configuration</th></tr>
+  <tr><td>Local development</td><td>Spring Boot default (human-readable)</td><td>No special config needed</td></tr>
+  <tr><td>Docker / production</td><td>ECS JSON (machine-parseable)</td><td><code>STRUCTURED_LOGGING=true</code> activates <code>logging.structured.format.console=ecs</code></td></tr>
+</table>
+
+<h3>ECS Format</h3>
+<p>With structured logging active, every log line is an ECS (Elastic Common Schema) JSON object. Loki, Elasticsearch, and most log aggregators parse it natively:</p>
+
+<pre><code>{
+  "@timestamp": "2026-03-01T16:03:32.868Z",
+  "log.level": "INFO",
+  "message": "Created order id=815977570206793968",
+  "ecs.version": "1.2.0",
+  "service.name": "boot4-reference",
+  "process.thread.name": "http-nio-8080-exec-1",
+  "log.logger": "com.example.boot4ref.order.service.OrderService",
+  "trace.id": "abc123def456...",
+  "span.id": "789ghi..."
+}</code></pre>
+
+<h3>Log Levels</h3>
+<table>
+  <tr><th>Level</th><th>Usage in codebase</th></tr>
+  <tr><td><code>ERROR</code></td><td>Unhandled exceptions (5xx), outbox publish failures after retries exhausted</td></tr>
+  <tr><td><code>WARN</code></td><td>Client errors (4xx), recoverable failures, invalid status transitions</td></tr>
+  <tr><td><code>INFO</code></td><td>Request handling, order creation, status transitions, outbox processing</td></tr>
+  <tr><td><code>DEBUG</code></td><td>Detailed operation logs (product updates, query parameters, lock acquisition)</td></tr>
+</table>
+
+<hr>
+
+<h2 id="tracing">Deep Dive: Distributed Tracing</h2>
+
+<h3>How traces are exported</h3>
+<p>Spring Boot 4 has built-in OTLP trace export via Micrometer Tracing + OpenTelemetry:</p>
+
+<pre><code># application.properties
+management.otlp.tracing.endpoint=http://localhost:4318/v1/traces</code></pre>
+
+<p>Spring auto-instruments these automatically:</p>
+<ul>
+  <li>Incoming HTTP requests (DispatcherServlet)</li>
+  <li>JDBC calls (datasource instrumentation)</li>
+  <li>Kafka sends (template instrumentation)</li>
+  <li>Scheduled tasks (<code>@Scheduled</code> outbox poller)</li>
+</ul>
+
+<h3>OTel Collector</h3>
+<p><strong>File:</strong> <code>infra/otel-collector.yml</code></p>
+<p>The collector receives OTLP data over HTTP (port 4318) and exports to:</p>
+<ul>
+  <li><strong>Tempo</strong> — full traces for distributed trace visualization</li>
+  <li><strong>Prometheus</strong> — span metrics (request duration histograms, error counts) via the <code>spanmetrics</code> connector</li>
+</ul>
+
+<hr>
+
+<h2 id="metrics">Deep Dive: Metrics</h2>
+
+<h3>Actuator Endpoints</h3>
+<p>Management endpoints run on a <strong>separate port</strong> (8081) to keep them off the public API port:</p>
+
+<table>
+  <tr><th>Endpoint</th><th>URL</th><th>Purpose</th></tr>
+  <tr><td>Health</td><td><code>http://localhost:8081/actuator/health</code></td><td>Application health (DB, Kafka, disk)</td></tr>
+  <tr><td>Prometheus</td><td><code>http://localhost:8081/actuator/prometheus</code></td><td>Metrics in Prometheus exposition format</td></tr>
+  <tr><td>Info</td><td><code>http://localhost:8081/actuator/info</code></td><td>Build info, git info</td></tr>
+</table>
+
+<h3>Key Metrics</h3>
+<table>
+  <tr><th>Metric</th><th>Type</th><th>What it measures</th></tr>
+  <tr><td><code>http.server.requests</code></td><td>Timer</td><td>Request latency by URI, method, status (with percentile histograms)</td></tr>
+  <tr><td><code>hikaricp.connections.active</code></td><td>Gauge</td><td>Active database connections</td></tr>
+  <tr><td><code>hikaricp.connections.idle</code></td><td>Gauge</td><td>Idle connections in pool</td></tr>
+  <tr><td><code>hikaricp.connections.pending</code></td><td>Gauge</td><td>Threads waiting for a connection</td></tr>
+  <tr><td><code>jvm.memory.used</code></td><td>Gauge</td><td>JVM heap and non-heap memory</td></tr>
+  <tr><td><code>jvm.gc.pause</code></td><td>Timer</td><td>GC pause duration and frequency</td></tr>
+  <tr><td><code>spring.kafka.template</code></td><td>Timer</td><td>Kafka send latency</td></tr>
+</table>
+
+<p>Percentile histograms are enabled for HTTP request latency:</p>
+<pre><code>management.metrics.distribution.percentiles-histogram.http.server.requests=true</code></pre>
+<p>Grafana computes p50, p95, p99 latencies from these histogram buckets.</p>
+
+<hr>
+
+<h2 id="correlation">Deep Dive: Correlation IDs</h2>
+
+<p>Every log line includes <code>traceId</code> and <code>spanId</code> via MDC (Mapped Diagnostic Context):</p>
+
+<pre><code>logging.pattern.correlation=[${spring.application.name:},%mdc{traceId:-},%mdc{spanId:-}]</code></pre>
+
+<p>Debugging workflow:</p>
+<ol>
+  <li>An error appears in Loki: <code>"Product not found" traceId=abc123</code></li>
+  <li>Copy <code>abc123</code>, paste into Tempo's search</li>
+  <li>See the full trace: which HTTP request, which DB queries, how long each took</li>
+  <li>Identify whether the problem is the client (bad ID), the database (missing row), or the application (logic error)</li>
+</ol>
+
+<div class="callout">
+<strong>Why separate management port?</strong>
+Actuator on a separate port (8081) because:
+<ul style="margin:.5rem 0 0 1.2rem">
+<li>Not exposed through the public load balancer</li>
+<li>Prometheus scrapes directly — no API gateway auth</li>
+<li>Health checks don't pollute API access logs</li>
+</ul>
+</div>
+
+<hr>
+
+<h2 id="dashboards">Grafana Dashboards</h2>
+
+<p>Dashboards are auto-provisioned from <code>infra/grafana/dashboards/</code> and connect to all three datasources
+(configured in <code>infra/datasources.yaml</code>).</p>
+
+<p><code>infra/start.sh</code> launches Grafana at <code>http://localhost:3000</code> with:</p>
+<ul>
+  <li>Pre-configured datasources for Tempo, Loki, and Prometheus</li>
+  <li>Pre-loaded dashboards for application metrics, JVM stats, and request tracing</li>
+  <li>No login required (anonymous access enabled for local development)</li>
+</ul>
+
+<hr>
+
+<h2 id="stack">Infrastructure Stack</h2>
+
+<table>
+  <tr><th>Component</th><th>Image</th><th>Port</th><th>Role</th></tr>
+  <tr><td>OTel Collector</td><td><code>otel/opentelemetry-collector-contrib</code></td><td>4318</td><td>Receives OTLP, exports to Tempo + Prometheus</td></tr>
+  <tr><td>Tempo</td><td><code>grafana/tempo</code></td><td>3200</td><td>Distributed trace storage and query</td></tr>
+  <tr><td>Loki</td><td><code>grafana/loki</code></td><td>3100</td><td>Log aggregation and search</td></tr>
+  <tr><td>Prometheus</td><td><code>prom/prometheus</code></td><td>9090</td><td>Metrics storage, scrapes app + OTel Collector</td></tr>
+  <tr><td>Grafana</td><td><code>grafana/grafana</code></td><td>3000</td><td>Visualization, dashboards, datasource federation</td></tr>
+</table>
+
+<h3>Prometheus Scrape Config</h3>
+<p><strong>File:</strong> <code>infra/prometheus.yml</code></p>
+<p>Prometheus scrapes two targets every 10 seconds:</p>
+<ul>
+  <li><code>otel-collector:8889/metrics</code> — span metrics from the OTel Collector</li>
+  <li><code>host.docker.internal:8081/actuator/prometheus</code> — application metrics from Spring Actuator</li>
+</ul>
+
+</main>
+</body>
+</html>

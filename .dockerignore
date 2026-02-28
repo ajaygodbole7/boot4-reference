@@ -1,0 +1,11 @@
+.git
+.gitignore
+.planning
+.claude
+target
+*.md
+*.iml
+.idea
+.vscode
+infra
+docs

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Testing Strategy — Boot4 Reference</title>
+<style>
+  :root {
+    --bg: #fafafa; --fg: #1a1a2e; --accent: #0f3460; --border: #ddd;
+    --code-bg: #f4f4f4; --success: #2e7d32; --warn: #e65100; --err: #c62828;
+    --sidebar-w: 260px; --nav-bg: #1a1a2e; --nav-fg: #e0e0e0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+         color: var(--fg); background: var(--bg); line-height: 1.6; }
+  nav { position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100vh;
+        background: var(--nav-bg); color: var(--nav-fg); overflow-y: auto;
+        padding: 1.5rem 0; z-index: 10; }
+  nav h2 { padding: 0 1rem 1rem; font-size: 1rem; border-bottom: 1px solid #333; margin-bottom: .5rem; }
+  nav .section-label { padding: .5rem 1rem 0; font-size: .7rem; text-transform: uppercase;
+                       letter-spacing: .08em; color: #888; }
+  nav a { display: block; padding: .35rem 1rem; color: var(--nav-fg); text-decoration: none;
+          font-size: .85rem; transition: background .15s; }
+  nav a:hover { background: rgba(255,255,255,.1); }
+  main { margin-left: var(--sidebar-w); padding: 2rem 3rem 4rem; max-width: 900px; }
+  h1 { font-size: 1.8rem; margin-bottom: .5rem; }
+  h2 { font-size: 1.4rem; margin: 2.5rem 0 .75rem; padding-bottom: .3rem;
+       border-bottom: 2px solid var(--accent); }
+  h3 { font-size: 1.15rem; margin: 1.5rem 0 .5rem; }
+  p, li { margin-bottom: .5rem; }
+  ul, ol { padding-left: 1.5rem; }
+  code { background: var(--code-bg); padding: .15em .4em; border-radius: 3px; font-size: .9em; }
+  pre { background: var(--code-bg); padding: 1rem; border-radius: 6px; overflow-x: auto;
+        font-size: .85rem; margin: .75rem 0 1rem; }
+  pre code { background: none; padding: 0; }
+  table { width: 100%; border-collapse: collapse; margin: .75rem 0 1.25rem; font-size: .9rem; }
+  th, td { text-align: left; padding: .5rem .75rem; border: 1px solid var(--border); }
+  th { background: var(--code-bg); font-weight: 600; }
+  .key-points { background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 8px;
+                padding: 1.25rem; margin: 1rem 0 1.5rem; }
+  .key-points h3 { margin-top: 0; color: var(--success); }
+  .callout { border-left: 4px solid var(--accent); background: #eff6ff; padding: 1rem 1.2rem;
+             margin: 1.5rem 0; border-radius: 0 6px 6px 0; }
+  .callout strong { display: block; margin-bottom: .3rem; }
+  .pyramid { text-align: center; margin: 1.5rem 0; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+
+<nav>
+  <h2>Boot4 Reference</h2>
+  <span class="section-label">Testing Strategy</span>
+  <a href="#key-points">Key Points</a>
+  <a href="#test-types">Which Test for What</a>
+  <a href="#pyramid">Testing Pyramid</a>
+  <a href="#unit-tests">Unit Tests</a>
+  <a href="#controller-tests">Controller Tests</a>
+  <a href="#repository-tests">Repository Tests</a>
+  <a href="#integration-tests">Integration Tests</a>
+  <a href="#concurrency-tests">Concurrency Tests</a>
+  <a href="#query-counting">Query Count Assertions</a>
+  <a href="#infrastructure">Test Infrastructure</a>
+  <a href="#running">Running Tests</a>
+  <span class="section-label">Other Docs</span>
+  <a href="spec.html">API Specification</a>
+  <a href="setup.html">Setup Guide</a>
+  <a href="request-lifecycle.html">Request Lifecycle</a>
+  <a href="error-handling.html">Error Handling</a>
+  <a href="outbox-pattern.html">Outbox Pattern</a>
+  <a href="observability.html">Observability</a>
+</nav>
+
+<main>
+
+<h1>Testing Strategy</h1>
+<p>Unit tests (Surefire) and integration tests (Failsafe) across the full domain.</p>
+
+<div class="key-points" id="key-points">
+<h3>Key Points</h3>
+<ul>
+  <li><strong>Unit tests</strong> (<code>*Test.java</code>) run with Maven Surefire — fast, no containers</li>
+  <li><strong>Integration tests</strong> (<code>*IT.java</code>) run with Maven Failsafe — real PostgreSQL via Testcontainers</li>
+  <li><code>mvn verify</code> runs both. <code>mvn test</code> runs unit tests only</li>
+  <li>Controller tests use <code>@WebMvcTest</code> (Boot 4 package), service tests use Mockito, repository tests use Testcontainers</li>
+  <li><code>datasource-proxy</code> wraps the DataSource in ITs to assert exact SQL query counts (N+1 detection)</li>
+</ul>
+</div>
+
+<hr>
+
+<h2 id="test-types">Which Test Type for What</h2>
+
+<table>
+  <tr><th>What to test</th><th>Test type</th><th>Suffix</th><th>Runner</th><th>Example</th></tr>
+  <tr><td>Service business logic</td><td>Unit</td><td><code>*Test</code></td><td>Surefire</td><td><code>ProductServiceTest</code></td></tr>
+  <tr><td>Entity methods, enums, DTOs</td><td>Unit</td><td><code>*Test</code></td><td>Surefire</td><td><code>OrderStatusTest</code>, <code>OrderTest</code></td></tr>
+  <tr><td>Controller HTTP mapping</td><td>Unit (slice)</td><td><code>*Test</code></td><td>Surefire</td><td><code>ProductControllerTest</code></td></tr>
+  <tr><td>Exception → HTTP status</td><td>Unit (slice)</td><td><code>*Test</code></td><td>Surefire</td><td><code>ExceptionTranslatorTest</code></td></tr>
+  <tr><td>JPA queries, Flyway</td><td>Integration</td><td><code>*IT</code></td><td>Failsafe</td><td><code>ProductRepositoryIT</code></td></tr>
+  <tr><td>Concurrency (locks, retries)</td><td>Integration</td><td><code>*IT</code></td><td>Failsafe</td><td><code>OrderServiceConcurrencyIT</code></td></tr>
+  <tr><td>Outbox end-to-end</td><td>Integration</td><td><code>*IT</code></td><td>Failsafe</td><td><code>OutboxIT</code></td></tr>
+  <tr><td>Application startup</td><td>Integration</td><td><code>*IT</code></td><td>Failsafe</td><td><code>Boot4RefApplicationIT</code></td></tr>
+</table>
+
+<hr>
+
+<h2 id="pyramid">Testing Pyramid</h2>
+
+<pre><code>           ┌─────────┐
+           │  E2E    │  infra/e2e-test.sh (shell, against running stack)
+          ─┼─────────┼─
+         / │  Integ  │ \  ITs — real DB, Testcontainers, concurrency
+        /  ─┼─────────┼─  \
+       /  / │  Unit   │ \  \  Mockito, @WebMvcTest, pure logic
+      ────────────────────────</code></pre>
+
+<p>Bottom-heavy by design:</p>
+<ul>
+  <li><strong>Unit</strong> — fast (seconds), catches most logic bugs</li>
+  <li><strong>Integration</strong> — real database, concurrency, Testcontainers</li>
+  <li><strong>E2E</strong> — shell script (<code>infra/e2e-test.sh</code>) against the full Docker stack</li>
+</ul>
+
+<hr>
+
+<h2 id="unit-tests">Deep Dive: Unit Tests</h2>
+
+<h3>Service Tests</h3>
+<p><strong>Pattern:</strong> <code>@ExtendWith(MockitoExtension.class)</code> with <code>@Mock</code> and <code>@InjectMocks</code>.</p>
+<p><strong>Examples:</strong> <code>ProductServiceTest</code>, <code>OrderServiceTest</code>, <code>OutboxPublisherTest</code></p>
+<p>Repository layer is mocked. Tests check:</p>
+<ul>
+  <li>Happy-path return values</li>
+  <li>Correct exceptions on error cases</li>
+  <li>Dependency interactions (<code>verify(repository).save(...)</code>)</li>
+  <li>Lifecycle state transitions — valid and invalid</li>
+</ul>
+
+<h3>Entity and Enum Tests</h3>
+<p><strong>Examples:</strong> <code>OrderStatusTest</code>, <code>OrderTest</code>, <code>AbstractAuditingEntityTest</code>, <code>ProductFixturesTest</code></p>
+<p>Pure Java logic — status transitions, bidirectional sync methods, equals/hashCode contracts, fixture generation.</p>
+
+<hr>
+
+<h2 id="controller-tests">Deep Dive: Controller Tests</h2>
+
+<p><strong>Pattern:</strong> <code>@WebMvcTest(ProductController.class)</code> — loads only the web layer, not the full context.</p>
+<p><strong>Import:</strong> <code>org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest</code> (Boot 4 modular package)</p>
+<p><strong>Examples:</strong> <code>ProductControllerTest</code>, <code>OrderControllerTest</code></p>
+
+<p><code>MockMvc</code> + <code>@MockitoBean</code> on the service layer. No database, no Testcontainers.</p>
+
+<p>Checks:</p>
+<ul>
+  <li>HTTP status codes per endpoint</li>
+  <li>JSON response structure and field values</li>
+  <li>Bean validation (empty body, missing fields, invalid values → 400)</li>
+  <li>Content-Type enforcement (PATCH requires <code>application/merge-patch+json</code>)</li>
+  <li><code>Location</code> header on 201 responses</li>
+</ul>
+
+<hr>
+
+<h2 id="repository-tests">Deep Dive: Repository Tests</h2>
+
+<p><strong>Pattern:</strong> <code>@SpringBootTest</code> + Testcontainers PostgreSQL</p>
+<p><strong>Examples:</strong> <code>ProductRepositoryIT</code>, <code>OrderRepositoryIT</code>, <code>FlywayMigrationIT</code></p>
+
+<p>Repository ITs verify:</p>
+<ul>
+  <li>Flyway migrations apply cleanly to a real PostgreSQL instance</li>
+  <li>Keyset pagination queries return correct results with cursors</li>
+  <li>Filtering by status, price range works correctly</li>
+  <li>JOIN FETCH queries load associations without N+1</li>
+  <li>Hibernate batch inserts/updates work as configured</li>
+</ul>
+
+<hr>
+
+<h2 id="integration-tests">Deep Dive: Full-Stack Integration Tests</h2>
+
+<p><strong>Pattern:</strong> <code>@SpringBootTest</code> with full application context + Testcontainers</p>
+<p><strong>Examples:</strong> <code>OrderServiceIT</code>, <code>ProductServiceIT</code>, <code>OutboxIT</code></p>
+
+<p>Full service → repository → database path with real transactions. ACID properties, cascade behavior, outbox end-to-end.</p>
+
+<hr>
+
+<h2 id="concurrency-tests">Deep Dive: Concurrency Tests</h2>
+
+<p><strong>File:</strong> <code>OrderServiceConcurrencyIT</code></p>
+
+<p>Concurrency tests use <code>ExecutorService</code> with multiple threads to verify:</p>
+<ul>
+  <li><strong>Pessimistic lock correctness:</strong> concurrent order placement for the same product must not oversell stock</li>
+  <li><strong>Optimistic lock retry:</strong> concurrent status transitions on the same order — one succeeds, the other retries via <code>@Retryable</code></li>
+  <li><strong>Stock consistency:</strong> after N concurrent orders, the total stock decrement equals the sum of successful orders</li>
+</ul>
+
+<div class="callout">
+<strong>Why concurrency tests matter:</strong>
+Stock is a classic race condition. Without pessimistic locking, two concurrent orders both read stock=10, both pass validation, both decrement to 8 — overselling by 2. The concurrency ITs catch this.
+</div>
+
+<hr>
+
+<h2 id="query-counting">Deep Dive: Query Count Assertions</h2>
+
+<p><strong>File:</strong> <code>DataSourceProxyConfiguration</code> (test scope)</p>
+
+<p><code>datasource-proxy</code> wraps the JDBC DataSource and counts SQL statements. N+1 problems get caught in tests, not production.</p>
+
+<p><strong>How it works:</strong></p>
+<ol>
+  <li><code>DataSourceProxyConfiguration</code> wraps the real DataSource with a <code>ProxyDataSource</code></li>
+  <li>A <code>QueryCountHolder</code> tracks SELECT/INSERT/UPDATE/DELETE counts per thread</li>
+  <li>Tests reset the counter, perform an operation, then assert the exact query count</li>
+</ol>
+
+<pre><code>// Example: verify that fetching an order with lines is exactly 1 query (JOIN FETCH)
+QueryCountHolder.clear();
+orderService.findById(orderId);
+assertThat(QueryCountHolder.getGrandTotal().getSelect()).isEqualTo(1);</code></pre>
+
+<hr>
+
+<h2 id="infrastructure">Test Infrastructure</h2>
+
+<table>
+  <tr><th>Class</th><th>Purpose</th></tr>
+  <tr><td><code>AbstractIntegrationTest</code></td><td>Base class for all <code>*IT</code> tests. Imports <code>TestcontainersConfiguration</code> (<code>@ServiceConnection</code>) and <code>DataSourceProxyConfiguration</code>. Activates <code>test</code> profile.</td></tr>
+  <tr><td><code>TestcontainersConfiguration</code></td><td>Shared PostgreSQL container definition. Reused across all ITs (container starts once).</td></tr>
+  <tr><td><code>TestBoot4RefApplication</code></td><td>Test bootstrap class. Run <code>TestBoot4RefApplication.main()</code> from IDE to start the app with Testcontainers.</td></tr>
+  <tr><td><code>DataSourceProxyConfiguration</code></td><td>Test-scoped config that wraps DataSource for query counting.</td></tr>
+</table>
+
+<hr>
+
+<h2 id="running">Running Tests</h2>
+
+<table>
+  <tr><th>Command</th><th>What runs</th><th>Time</th></tr>
+  <tr><td><code>mvn test</code></td><td>Unit tests only (Surefire: <code>*Test.java</code>)</td><td>~5 seconds</td></tr>
+  <tr><td><code>mvn verify</code></td><td>Unit + integration tests (Surefire + Failsafe)</td><td>~30 seconds</td></tr>
+  <tr><td><code>mvn verify -Dsurefire.skip=true</code></td><td>Integration tests only (skip Surefire, run Failsafe)</td><td>~25 seconds</td></tr>
+  <tr><td><code>mvn test -Dtest=ProductServiceTest</code></td><td>Single test class</td><td>~2 seconds</td></tr>
+</table>
+
+<p>Testcontainers needs Docker running. No Docker = ITs fail. Unit tests never need Docker.</p>
+
+</main>
+</body>
+</html>

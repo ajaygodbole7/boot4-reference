@@ -1,0 +1,8 @@
+.planning/
+.claude/
+CLAUDE.md
+.DS_Store
+target/
+.idea/
+app.log
+.app.pid
