@@ -1,6 +1,7 @@
 package com.example.boot4ref.order.rest;
 
 import com.example.boot4ref.common.rest.ExceptionTranslator;
+import com.example.boot4ref.config.ApplicationProperties;
 import com.example.boot4ref.order.OrderStatus;
 import com.example.boot4ref.order.exception.DiscontinuedProductException;
 import com.example.boot4ref.order.exception.InsufficientStockException;
@@ -10,6 +11,7 @@ import com.example.boot4ref.order.service.OrderService;
 import com.example.boot4ref.product.exception.ProductNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -38,6 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(controllers = OrderController.class)
 @Import(ExceptionTranslator.class)
+@EnableConfigurationProperties(ApplicationProperties.class)
 class OrderControllerTest {
 
     @Autowired

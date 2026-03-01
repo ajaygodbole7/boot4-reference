@@ -16,23 +16,36 @@ class ApplicationPropertiesValidationTest {
             .withUserConfiguration(TestConfig.class);
 
     @Test
-    void shouldLoadContextWithValidConfig() {
+    void shouldLoadContextWithDefaults() {
         contextRunner
-                .withPropertyValues("app.max-retries=3")
                 .run(context -> assertThat(context).hasNotFailed());
     }
 
     @Test
-    void shouldFailStartupWhenMaxRetriesIsNegative() {
+    void shouldFailWhenPageSizeIsZero() {
         contextRunner
-                .withPropertyValues("app.max-retries=-1")
+                .withPropertyValues("app.pagination.default-page-size=0")
                 .run(context -> assertThat(context).hasFailed());
     }
 
     @Test
-    void shouldFailStartupWhenMaxRetriesExceedsMax() {
+    void shouldFailWhenPageSizeExceedsMax() {
         contextRunner
-                .withPropertyValues("app.max-retries=99")
+                .withPropertyValues("app.pagination.default-page-size=101")
+                .run(context -> assertThat(context).hasFailed());
+    }
+
+    @Test
+    void shouldFailWhenOutboxBatchSizeIsZero() {
+        contextRunner
+                .withPropertyValues("app.outbox.batch-size=0")
+                .run(context -> assertThat(context).hasFailed());
+    }
+
+    @Test
+    void shouldFailWhenKafkaTimeoutIsZero() {
+        contextRunner
+                .withPropertyValues("app.kafka.send-timeout-seconds=0")
                 .run(context -> assertThat(context).hasFailed());
     }
 

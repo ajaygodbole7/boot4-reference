@@ -13,10 +13,12 @@ import jakarta.validation.Path;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
+import com.example.boot4ref.config.ApplicationProperties;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -38,6 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = ExceptionTranslatorTest.TestController.class)
 @Import({ExceptionTranslator.class, ExceptionTranslatorTest.TestController.class})
+@EnableConfigurationProperties(ApplicationProperties.class)
 class ExceptionTranslatorTest {
 
     @Autowired

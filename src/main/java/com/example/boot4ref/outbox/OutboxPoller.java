@@ -1,5 +1,6 @@
 package com.example.boot4ref.outbox;
 
+import com.example.boot4ref.config.ApplicationProperties;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -32,26 +33,29 @@ import org.springframework.transaction.annotation.Transactional;
 public class OutboxPoller {
 
     private static final Logger log = LoggerFactory.getLogger(OutboxPoller.class);
-    private static final int BATCH_SIZE = 50;
-    private static final int CLEANUP_DAYS = 7;
 
     private final OutboxEventRepository outboxEventRepository;
     private final KafkaEventPublisher kafkaEventPublisher;
+    private final int batchSize;
+    private final int retentionDays;
 
     public OutboxPoller(OutboxEventRepository outboxEventRepository,
-                        KafkaEventPublisher kafkaEventPublisher) {
+                        KafkaEventPublisher kafkaEventPublisher,
+                        ApplicationProperties properties) {
         this.outboxEventRepository = outboxEventRepository;
         this.kafkaEventPublisher = kafkaEventPublisher;
+        this.batchSize = properties.getOutbox().getBatchSize();
+        this.retentionDays = properties.getOutbox().getRetentionDays();
     }
 
     /**
      * Polls for pending outbox entries every 1 second.
      * SKIP LOCKED ensures parallel pollers claim different rows without blocking.
      */
-    @Scheduled(fixedDelay = 1000)
+    @Scheduled(fixedDelayString = "${app.outbox.poll-interval-ms}")
     @Transactional
     public void poll() {
-        List<OutboxEvent> pending = outboxEventRepository.findPendingWithLock(BATCH_SIZE);
+        List<OutboxEvent> pending = outboxEventRepository.findPendingWithLock(batchSize);
         if (pending.isEmpty()) {
             return;
         }
@@ -79,13 +83,13 @@ public class OutboxPoller {
      * <p>{@code @Transactional} required: {@code @Modifying} deleteProcessedBefore needs
      * an active transaction. {@code @Scheduled} methods do not inherit a transaction.
      */
-    @Scheduled(fixedDelay = 3_600_000)
+    @Scheduled(fixedDelayString = "${app.outbox.cleanup-interval-ms}")
     @Transactional
     public void cleanup() {
-        Instant cutoff = Instant.now().minus(CLEANUP_DAYS, ChronoUnit.DAYS);
+        Instant cutoff = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
         int deleted = outboxEventRepository.deleteProcessedBefore(cutoff);
         if (deleted > 0) {
-            log.info("Cleaned up {} processed outbox events older than {} days", deleted, CLEANUP_DAYS);
+            log.info("Cleaned up {} processed outbox events older than {} days", deleted, retentionDays);
         }
     }
 }

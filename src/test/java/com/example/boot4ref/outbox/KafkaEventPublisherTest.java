@@ -1,9 +1,11 @@
 package com.example.boot4ref.outbox;
 
+import com.example.boot4ref.config.ApplicationProperties;
+import com.example.boot4ref.order.event.EventTypes;
 import java.util.concurrent.CompletableFuture;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -24,13 +26,18 @@ class KafkaEventPublisherTest {
     @Mock
     private KafkaTemplate<String, String> kafkaTemplate;
 
-    @InjectMocks
     private KafkaEventPublisher kafkaEventPublisher;
+
+    @BeforeEach
+    void setUp() {
+        ApplicationProperties properties = new ApplicationProperties();
+        kafkaEventPublisher = new KafkaEventPublisher(kafkaTemplate, properties);
+    }
 
     @Test
     void shouldPublishToTopicDerivedFromAggregateType() {
         stubKafkaSend();
-        OutboxEvent event = createEvent("Order", 42L, "Order::placed", "{}");
+        OutboxEvent event = createEvent("Order", 42L, EventTypes.ORDER_PLACED, "{}");
 
         kafkaEventPublisher.publish(event);
 
@@ -50,7 +57,7 @@ class KafkaEventPublisherTest {
     @Test
     void shouldUseAggregateIdAsMessageKey() {
         stubKafkaSend();
-        OutboxEvent event = createEvent("Order", 99L, "Order::confirmed", "{}");
+        OutboxEvent event = createEvent("Order", 99L, EventTypes.ORDER_CONFIRMED, "{}");
 
         kafkaEventPublisher.publish(event);
 

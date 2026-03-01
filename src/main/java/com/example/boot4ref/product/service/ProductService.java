@@ -1,5 +1,6 @@
 package com.example.boot4ref.product.service;
 
+import com.example.boot4ref.config.ApplicationProperties;
 import com.example.boot4ref.product.Product;
 import com.example.boot4ref.product.ProductStatus;
 import com.example.boot4ref.product.exception.ProductConflictException;
@@ -37,12 +38,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductService {
 
     private static final Logger log = LoggerFactory.getLogger(ProductService.class);
-    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int OPTIMISTIC_LOCK_MAX_ATTEMPTS = 3;
+    private static final int OPTIMISTIC_LOCK_RETRY_DELAY_MS = 100;
 
     private final ProductRepository productRepository;
+    private final int defaultPageSize;
 
-    public ProductService(ProductRepository productRepository) {
+    public ProductService(ProductRepository productRepository, ApplicationProperties properties) {
         this.productRepository = productRepository;
+        this.defaultPageSize = properties.getPagination().getDefaultPageSize();
     }
 
     /**
@@ -73,7 +77,7 @@ public class ProductService {
                 .and(ProductSpecifications.maxPrice(maxPrice))
                 .and(ProductSpecifications.keysetAfter(afterCreatedAt, afterId));
 
-        int pageSize = (limit != null && limit > 0) ? limit : DEFAULT_PAGE_SIZE;
+        int pageSize = (limit != null && limit > 0) ? limit : defaultPageSize;
 
         return productRepository.findAll(spec,
                         PageRequest.of(0, pageSize, Sort.by("createdAt", "id")))
@@ -121,8 +125,9 @@ public class ProductService {
      *
      * @throws ProductNotFoundException if not found
      */
-    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 3,
-            backoff = @Backoff(delay = 100, multiplier = 2, random = true))
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class,
+            maxAttempts = OPTIMISTIC_LOCK_MAX_ATTEMPTS,
+            backoff = @Backoff(delay = OPTIMISTIC_LOCK_RETRY_DELAY_MS, multiplier = 2, random = true))
     @Transactional
     public ProductResponse update(Long id, ProductUpdateRequest request) {
         Product product = findOrThrow(id);
@@ -148,8 +153,9 @@ public class ProductService {
      *
      * @throws ProductNotFoundException if not found
      */
-    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 3,
-            backoff = @Backoff(delay = 100, multiplier = 2, random = true))
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class,
+            maxAttempts = OPTIMISTIC_LOCK_MAX_ATTEMPTS,
+            backoff = @Backoff(delay = OPTIMISTIC_LOCK_RETRY_DELAY_MS, multiplier = 2, random = true))
     @Transactional
     public ProductResponse patch(Long id, ProductPatchRequest request) {
         Product product = findOrThrow(id);

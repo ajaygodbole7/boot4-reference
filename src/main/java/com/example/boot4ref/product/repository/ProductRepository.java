@@ -21,6 +21,8 @@ import org.springframework.data.jpa.repository.QueryHints;
  */
 public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
 
+    String LOCK_TIMEOUT_MS = "3000";
+
     /**
      * Finds all products matching the given specification.
      * Product has no lazy associations — no @EntityGraph needed.
@@ -29,9 +31,9 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     /**
      * Acquires a PESSIMISTIC_WRITE lock on a product row for stock decrement.
-     * Lock timeout 3000ms prevents indefinite waiting on contended rows.
+     * Lock timeout prevents indefinite waiting on contended rows.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = LOCK_TIMEOUT_MS))
     Optional<Product> findWithLockById(Long id);
 }

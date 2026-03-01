@@ -4,6 +4,7 @@ import com.example.boot4ref.common.exception.BusinessRuleException;
 import com.example.boot4ref.common.exception.ResourceConflictException;
 import com.example.boot4ref.common.exception.ResourceNotFoundException;
 import com.example.boot4ref.common.exception.ServiceUnavailableException;
+import com.example.boot4ref.config.ApplicationProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
@@ -50,13 +51,15 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 public class ExceptionTranslator {
 
     private static final Logger log = LoggerFactory.getLogger(ExceptionTranslator.class);
-    private static final String ERROR_BASE_URL = "https://api.boot4ref.example.com/errors/";
+    private static final int MAX_STACK_TRACE_LENGTH = 5000;
     private static final String ERROR_CODE = "errorCode";
     private static final String TIMESTAMP = "timestamp";
     private final boolean isDevProfile;
+    private final String errorBaseUrl;
 
-    public ExceptionTranslator(Environment env) {
+    public ExceptionTranslator(Environment env, ApplicationProperties properties) {
         this.isDevProfile = env.acceptsProfiles(Profiles.of("dev"));
+        this.errorBaseUrl = properties.getErrorBaseUrl();
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -252,7 +255,7 @@ public class ExceptionTranslator {
         ProblemDetail problemDetail = ProblemDetail.forStatus(status);
         problemDetail.setTitle(title);
         problemDetail.setDetail(ex.getMessage());
-        problemDetail.setType(URI.create(ERROR_BASE_URL + status.value()));
+        problemDetail.setType(URI.create(errorBaseUrl + status.value()));
         problemDetail.setInstance(URI.create(request.getRequestURI()));
         problemDetail.setProperty(ERROR_CODE, title.toUpperCase().replace(" ", "_"));
         problemDetail.setProperty(TIMESTAMP, Instant.now());
@@ -263,14 +266,13 @@ public class ExceptionTranslator {
     }
 
     private void addDebugInfo(ProblemDetail detail, Exception ex) {
-        final int maxStackTraceLength = 5000;
         if (detail == null || ex == null) return;
         if (isDevProfile) {
             detail.setProperty("exception", ex.getClass().getName());
             String fullStackTrace = ExceptionUtils.getStackTrace(ex);
             String truncatedStackTrace =
-                    fullStackTrace.length() > maxStackTraceLength
-                            ? fullStackTrace.substring(0, maxStackTraceLength) + "..."
+                    fullStackTrace.length() > MAX_STACK_TRACE_LENGTH
+                            ? fullStackTrace.substring(0, MAX_STACK_TRACE_LENGTH) + "..."
                             : fullStackTrace;
             detail.setProperty("stackTrace", truncatedStackTrace);
         }

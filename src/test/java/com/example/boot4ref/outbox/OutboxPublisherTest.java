@@ -1,6 +1,7 @@
 package com.example.boot4ref.outbox;
 
 import com.example.boot4ref.order.event.DomainEvent;
+import com.example.boot4ref.order.event.EventTypes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,7 +49,7 @@ class OutboxPublisherTest {
 
         publisher.publish(event);
 
-        assertThat(eventCaptor.getValue().getEventType()).isEqualTo("Order::placed");
+        assertThat(eventCaptor.getValue().getEventType()).isEqualTo(EventTypes.ORDER_PLACED);
     }
 
     @Test
@@ -58,7 +59,7 @@ class OutboxPublisherTest {
 
         publisher.publish(event);
 
-        assertThat(eventCaptor.getValue().getEventType()).isEqualTo("Order::confirmed");
+        assertThat(eventCaptor.getValue().getEventType()).isEqualTo(EventTypes.ORDER_CONFIRMED);
     }
 
     @Test
@@ -68,7 +69,7 @@ class OutboxPublisherTest {
 
         publisher.publish(event);
 
-        assertThat(eventCaptor.getValue().getEventType()).isEqualTo("Order::shipped");
+        assertThat(eventCaptor.getValue().getEventType()).isEqualTo(EventTypes.ORDER_SHIPPED);
     }
 
     @Test
@@ -78,7 +79,7 @@ class OutboxPublisherTest {
 
         publisher.publish(event);
 
-        assertThat(eventCaptor.getValue().getEventType()).isEqualTo("Order::delivered");
+        assertThat(eventCaptor.getValue().getEventType()).isEqualTo(EventTypes.ORDER_DELIVERED);
     }
 
     @Test
@@ -88,7 +89,7 @@ class OutboxPublisherTest {
 
         publisher.publish(event);
 
-        assertThat(eventCaptor.getValue().getEventType()).isEqualTo("Order::cancelled");
+        assertThat(eventCaptor.getValue().getEventType()).isEqualTo(EventTypes.ORDER_CANCELLED);
     }
 
     // --- Outbox entry fields ---

@@ -1,5 +1,6 @@
 package com.example.boot4ref.product.rest;
 
+import com.example.boot4ref.product.ProductConstraints;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -18,11 +19,13 @@ import org.jspecify.annotations.Nullable;
  */
 public record ProductUpdateRequest(
         @NotBlank(message = "Product name is required")
-        @Size(min = 3, max = 100, message = "Product name must be between 3 and 100 characters")
+        @Size(min = ProductConstraints.NAME_MIN_LENGTH, max = ProductConstraints.NAME_MAX_LENGTH,
+                message = "Product name must be between 3 and 100 characters")
         String name,
 
         @Nullable
-        @Size(max = 500, message = "Description must not exceed 500 characters")
+        @Size(max = ProductConstraints.DESCRIPTION_MAX_LENGTH,
+                message = "Description must not exceed 500 characters")
         String description,
 
         @NotNull(message = "Price is required")

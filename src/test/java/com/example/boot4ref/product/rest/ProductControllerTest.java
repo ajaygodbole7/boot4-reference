@@ -1,12 +1,14 @@
 package com.example.boot4ref.product.rest;
 
 import com.example.boot4ref.common.rest.ExceptionTranslator;
+import com.example.boot4ref.config.ApplicationProperties;
 import com.example.boot4ref.product.ProductStatus;
 import com.example.boot4ref.product.exception.ProductConflictException;
 import com.example.boot4ref.product.exception.ProductNotFoundException;
 import com.example.boot4ref.product.service.ProductService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -39,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(ProductController.class)
 @Import(ExceptionTranslator.class)
+@EnableConfigurationProperties(ApplicationProperties.class)
 class ProductControllerTest {
 
     @Autowired

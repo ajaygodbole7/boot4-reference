@@ -1,7 +1,9 @@
 package com.example.boot4ref.common.rest;
 
+import com.example.boot4ref.config.ApplicationProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
@@ -17,6 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(controllers = ExceptionTranslatorTest.TestController.class)
 @Import({ExceptionTranslator.class, ExceptionTranslatorTest.TestController.class})
+@EnableConfigurationProperties(ApplicationProperties.class)
 @ActiveProfiles("dev")
 class ExceptionTranslatorDevProfileTest {
 

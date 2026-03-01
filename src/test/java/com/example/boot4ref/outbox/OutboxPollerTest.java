@@ -1,9 +1,11 @@
 package com.example.boot4ref.outbox;
 
+import com.example.boot4ref.config.ApplicationProperties;
+import com.example.boot4ref.order.event.EventTypes;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -28,8 +30,13 @@ class OutboxPollerTest {
     @Mock
     private KafkaEventPublisher kafkaEventPublisher;
 
-    @InjectMocks
     private OutboxPoller outboxPoller;
+
+    @BeforeEach
+    void setUp() {
+        ApplicationProperties properties = new ApplicationProperties();
+        outboxPoller = new OutboxPoller(outboxEventRepository, kafkaEventPublisher, properties);
+    }
 
     @Test
     void shouldDoNothingWhenNoPendingEvents() {
@@ -107,7 +114,7 @@ class OutboxPollerTest {
         return OutboxEvent.builder()
                 .aggregateType("Order")
                 .aggregateId(1L)
-                .eventType("Order::placed")
+                .eventType(EventTypes.ORDER_PLACED)
                 .payload("{}")
                 .build();
     }

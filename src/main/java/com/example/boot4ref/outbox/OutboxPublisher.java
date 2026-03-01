@@ -1,6 +1,7 @@
 package com.example.boot4ref.outbox;
 
 import com.example.boot4ref.order.event.DomainEvent;
+import com.example.boot4ref.order.event.EventTypes;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
 import tools.jackson.core.JacksonException;
@@ -54,11 +55,11 @@ public class OutboxPublisher {
      */
     private String resolveEventType(DomainEvent event) {
         return switch (event) {
-            case DomainEvent.OrderPlaced _ -> "Order::placed";
-            case DomainEvent.OrderConfirmed _ -> "Order::confirmed";
-            case DomainEvent.OrderShipped _ -> "Order::shipped";
-            case DomainEvent.OrderDelivered _ -> "Order::delivered";
-            case DomainEvent.OrderCancelled _ -> "Order::cancelled";
+            case DomainEvent.OrderPlaced _ -> EventTypes.ORDER_PLACED;
+            case DomainEvent.OrderConfirmed _ -> EventTypes.ORDER_CONFIRMED;
+            case DomainEvent.OrderShipped _ -> EventTypes.ORDER_SHIPPED;
+            case DomainEvent.OrderDelivered _ -> EventTypes.ORDER_DELIVERED;
+            case DomainEvent.OrderCancelled _ -> EventTypes.ORDER_CANCELLED;
         };
     }
 

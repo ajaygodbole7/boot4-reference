@@ -1,5 +1,6 @@
 package com.example.boot4ref.outbox;
 
+import com.example.boot4ref.config.ApplicationProperties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -26,11 +27,17 @@ import org.springframework.stereotype.Component;
 public class KafkaEventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(KafkaEventPublisher.class);
+    private static final int KAFKA_RETRY_MAX_ATTEMPTS = 3;
+    private static final int KAFKA_RETRY_DELAY_MS = 200;
+    private static final String TOPIC_SUFFIX = "-events";
 
     private final KafkaTemplate<String, String> kafkaTemplate;
+    private final long sendTimeoutSeconds;
 
-    public KafkaEventPublisher(KafkaTemplate<String, String> kafkaTemplate) {
+    public KafkaEventPublisher(KafkaTemplate<String, String> kafkaTemplate,
+                               ApplicationProperties properties) {
         this.kafkaTemplate = kafkaTemplate;
+        this.sendTimeoutSeconds = properties.getKafka().getSendTimeoutSeconds();
     }
 
     /**
@@ -38,13 +45,13 @@ public class KafkaEventPublisher {
      * Topic is derived from aggregate type (e.g., "order-events").
      * {@code @Retryable} retries transient Kafka publish failures.
      */
-    @Retryable(retryFor = Exception.class, maxAttempts = 3,
-            backoff = @Backoff(delay = 200, multiplier = 2, random = true))
+    @Retryable(retryFor = Exception.class, maxAttempts = KAFKA_RETRY_MAX_ATTEMPTS,
+            backoff = @Backoff(delay = KAFKA_RETRY_DELAY_MS, multiplier = 2, random = true))
     public void publish(OutboxEvent event) {
-        String topic = event.getAggregateType().toLowerCase() + "-events";
+        String topic = event.getAggregateType().toLowerCase() + TOPIC_SUFFIX;
         try {
             kafkaTemplate.send(topic, event.getAggregateId().toString(), event.getPayload())
-                    .get(10, TimeUnit.SECONDS);
+                    .get(sendTimeoutSeconds, TimeUnit.SECONDS);
         } catch (ExecutionException e) {
             throw new RuntimeException("Kafka send failed for event id=" + event.getId(), e.getCause());
         } catch (InterruptedException e) {

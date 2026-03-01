@@ -3,6 +3,7 @@ package com.example.boot4ref;
 import com.example.boot4ref.common.fixture.OrderFixtures;
 import com.example.boot4ref.common.fixture.ProductFixtures;
 import com.example.boot4ref.order.OrderStatus;
+import com.example.boot4ref.order.event.EventTypes;
 import com.example.boot4ref.order.rest.OrderCreateRequest;
 import com.example.boot4ref.order.rest.OrderLineRequest;
 import com.example.boot4ref.order.rest.OrderResponse;
@@ -60,7 +61,7 @@ class OutboxIT extends AbstractIntegrationTest {
         OutboxEvent event = events.getFirst();
         assertThat(event.getAggregateType()).isEqualTo("Order");
         assertThat(event.getAggregateId()).isEqualTo(created.id());
-        assertThat(event.getEventType()).isEqualTo("Order::placed");
+        assertThat(event.getEventType()).isEqualTo(EventTypes.ORDER_PLACED);
         assertThat(event.getStatus()).isEqualTo(OutboxStatus.PENDING);
         assertThat(event.getRetryCount()).isZero();
     }
@@ -76,7 +77,7 @@ class OutboxIT extends AbstractIntegrationTest {
         List<OutboxEvent> events = outboxEventRepository.findAll();
         assertThat(events).hasSize(2);
         assertThat(events.stream().map(OutboxEvent::getEventType).toList())
-                .containsExactlyInAnyOrder("Order::placed", "Order::confirmed");
+                .containsExactlyInAnyOrder(EventTypes.ORDER_PLACED, EventTypes.ORDER_CONFIRMED);
     }
 
     @Test
@@ -142,7 +143,8 @@ class OutboxIT extends AbstractIntegrationTest {
         List<String> eventTypes = outboxEventRepository.findAll().stream()
                 .map(OutboxEvent::getEventType).toList();
         assertThat(eventTypes).containsExactly(
-                "Order::placed", "Order::confirmed", "Order::shipped", "Order::delivered");
+                EventTypes.ORDER_PLACED, EventTypes.ORDER_CONFIRMED,
+                EventTypes.ORDER_SHIPPED, EventTypes.ORDER_DELIVERED);
     }
 
     @Test
@@ -155,7 +157,7 @@ class OutboxIT extends AbstractIntegrationTest {
 
         List<String> eventTypes = outboxEventRepository.findAll().stream()
                 .map(OutboxEvent::getEventType).toList();
-        assertThat(eventTypes).containsExactly("Order::placed", "Order::cancelled");
+        assertThat(eventTypes).containsExactly(EventTypes.ORDER_PLACED, EventTypes.ORDER_CANCELLED);
     }
 
     @Test

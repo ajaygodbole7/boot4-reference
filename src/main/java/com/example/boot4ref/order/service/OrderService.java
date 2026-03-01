@@ -1,5 +1,6 @@
 package com.example.boot4ref.order.service;
 
+import com.example.boot4ref.config.ApplicationProperties;
 import com.example.boot4ref.order.Order;
 import com.example.boot4ref.order.OrderLine;
 import com.example.boot4ref.order.OrderStatus;
@@ -42,18 +43,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderService {
 
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
-    private static final int DEFAULT_PAGE_SIZE = 20;
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final OutboxPublisher outboxPublisher;
+    private final int defaultPageSize;
 
     public OrderService(OrderRepository orderRepository,
                         ProductRepository productRepository,
-                        OutboxPublisher outboxPublisher) {
+                        OutboxPublisher outboxPublisher,
+                        ApplicationProperties properties) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.outboxPublisher = outboxPublisher;
+        this.defaultPageSize = properties.getPagination().getDefaultPageSize();
     }
 
     /**
@@ -91,7 +94,7 @@ public class OrderService {
                 .toList();
 
         for (OrderLineRequest item : sortedItems) {
-            // PESSIMISTIC_WRITE lock with 3000ms timeout
+            // PESSIMISTIC_WRITE lock — timeout defined by ProductRepository.LOCK_TIMEOUT_MS
             Product product = productRepository.findWithLockById(item.productId())
                     .orElseThrow(() -> new ProductNotFoundException(item.productId()));
 
@@ -170,7 +173,7 @@ public class OrderService {
         Specification<Order> spec = OrderSpecifications.byStatus(status)
                 .and(OrderSpecifications.keysetAfter(afterCreatedAt, afterId));
 
-        int pageSize = (limit != null && limit > 0) ? limit : DEFAULT_PAGE_SIZE;
+        int pageSize = (limit != null && limit > 0) ? limit : defaultPageSize;
 
         return orderRepository.findAll(spec,
                         PageRequest.of(0, pageSize, Sort.by("createdAt", "id")))

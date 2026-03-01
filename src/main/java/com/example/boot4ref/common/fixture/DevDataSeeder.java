@@ -21,6 +21,8 @@ import org.springframework.stereotype.Component;
 public class DevDataSeeder implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DevDataSeeder.class);
+    private static final int PRODUCT_SEED_COUNT = 10;
+    private static final int ORDER_SEED_COUNT = 5;
 
     private final ProductRepository productRepository;
     private final OrderService orderService;
@@ -38,18 +40,18 @@ public class DevDataSeeder implements ApplicationRunner {
             return;
         }
 
-        log.info("Seeding dev data: 10 products + 5 orders");
+        log.info("Seeding dev data: {} products + {} orders", PRODUCT_SEED_COUNT, ORDER_SEED_COUNT);
 
-        // Create 10 products and activate them — keep references for order seeding
+        // Create products and activate them — keep references for order seeding
         List<Product> products = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < PRODUCT_SEED_COUNT; i++) {
             Product product = productRepository.save(ProductFixtures.randomActiveProduct());
             products.add(product);
             log.debug("Seeded product id={} name={}", product.getId(), product.getName());
         }
 
-        // Create 5 orders against saved products
-        for (int i = 0; i < 5; i++) {
+        // Create orders against saved products
+        for (int i = 0; i < ORDER_SEED_COUNT; i++) {
             Product target = products.get(i % products.size());
             var response = orderService.create(
                     OrderFixtures.randomOrderCreateRequest(target.getId()),
