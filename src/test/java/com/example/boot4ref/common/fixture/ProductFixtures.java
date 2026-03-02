@@ -10,7 +10,6 @@ import java.math.RoundingMode;
 
 /**
  * Shared test fixtures for the Product domain using DataFaker.
- * Used by {@code @Profile("dev")} seeder and test classes.
  */
 public final class ProductFixtures {
 

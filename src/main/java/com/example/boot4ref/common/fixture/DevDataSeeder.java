@@ -7,7 +7,7 @@ import com.example.boot4ref.product.Product;
 import com.example.boot4ref.product.ProductStatus;
 import com.example.boot4ref.product.repository.ProductRepository;
 import java.math.BigDecimal;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +25,7 @@ import org.springframework.stereotype.Component;
 public class DevDataSeeder implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DevDataSeeder.class);
+    private static final int ORDER_SEED_COUNT = 5;
 
     private static final String[][] PRODUCTS = {
             {"Ergonomic Keyboard", "Mechanical switches with split design", "149.99", "42"},
@@ -55,22 +56,21 @@ public class DevDataSeeder implements ApplicationRunner {
             return;
         }
 
-        log.info("Seeding dev data: {} products + 5 orders", PRODUCTS.length);
+        log.info("Seeding dev data: {} products + {} orders", PRODUCTS.length, ORDER_SEED_COUNT);
 
-        List<Product> products = new ArrayList<>();
-        for (String[] row : PRODUCTS) {
-            Product product = Product.builder()
-                    .name(row[0])
-                    .description(row[1])
-                    .price(new BigDecimal(row[2]))
-                    .stock(Integer.parseInt(row[3]))
-                    .status(ProductStatus.ACTIVE)
-                    .build();
-            products.add(productRepository.save(product));
-            log.debug("Seeded product id={} name={}", product.getId(), product.getName());
-        }
+        List<Product> toSave = Arrays.stream(PRODUCTS)
+                .map(row -> Product.builder()
+                        .name(row[0])
+                        .description(row[1])
+                        .price(new BigDecimal(row[2]))
+                        .stock(Integer.parseInt(row[3]))
+                        .status(ProductStatus.ACTIVE)
+                        .build())
+                .toList();
+        List<Product> products = productRepository.saveAll(toSave);
+        products.forEach(p -> log.debug("Seeded product id={} name={}", p.getId(), p.getName()));
 
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < ORDER_SEED_COUNT; i++) {
             Product target = products.get(i % products.size());
             var response = orderService.create(
                     new OrderCreateRequest(List.of(new OrderLineRequest(target.getId(), i + 1))),

@@ -8,7 +8,6 @@ import java.util.List;
 
 /**
  * Shared test fixtures for the Order domain using DataFaker.
- * Used by {@code @Profile("dev")} seeder and test classes.
  */
 public final class OrderFixtures {
 
