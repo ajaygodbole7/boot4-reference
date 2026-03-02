@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderController implements OrderApi {
 
     private static final Logger log = LoggerFactory.getLogger(OrderController.class);
+    private static final String IDEMPOTENCY_KEY_CONSTRAINT = "idempotency_key";
 
     private final OrderService orderService;
 
@@ -36,7 +37,7 @@ public class OrderController implements OrderApi {
             created = orderService.create(request, idempotencyKey);
         } catch (DataIntegrityViolationException ex) {
             // Only recover from idempotency key constraint violations.
-            // Other constraint violations (FK, null) should propagate as 500.
+            // Other constraint violations (FK, null) propagate to ExceptionTranslator (409).
             if (idempotencyKey != null && isIdempotencyKeyViolation(ex)) {
                 log.warn("Idempotency key race detected for key={}: {}", idempotencyKey, ex.getMessage());
                 created = orderService.findByIdempotencyKey(idempotencyKey);
@@ -70,7 +71,7 @@ public class OrderController implements OrderApi {
     private static boolean isIdempotencyKeyViolation(DataIntegrityViolationException ex) {
         if (ex.getCause() instanceof ConstraintViolationException cve) {
             String constraintName = cve.getConstraintName();
-            return constraintName != null && constraintName.contains("idempotency_key");
+            return constraintName != null && constraintName.contains(IDEMPOTENCY_KEY_CONSTRAINT);
         }
         return false;
     }

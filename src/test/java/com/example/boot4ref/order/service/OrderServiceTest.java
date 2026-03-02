@@ -22,6 +22,7 @@ import static org.mockito.Mockito.when;
  * Unit tests for {@link OrderService}.
  */
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("unchecked") // Mockito any(Specification.class) returns raw type
 class OrderServiceTest {
 
     @Mock
@@ -33,7 +34,6 @@ class OrderServiceTest {
     @Mock
     private OutboxPublisher outboxPublisher;
 
-    @SuppressWarnings("unchecked")
     private OrderService createService(int defaultPageSize, int maxPageSize) {
         ApplicationProperties properties = new ApplicationProperties();
         properties.getPagination().setDefaultPageSize(defaultPageSize);

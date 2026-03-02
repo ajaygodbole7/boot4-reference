@@ -90,28 +90,26 @@ public class ExceptionTranslator {
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
     public ResponseEntity<ProblemDetail> handleOptimisticLock(
             ObjectOptimisticLockingFailureException ex, HttpServletRequest request) {
-        ProblemDetail problemDetail = createBaseProblemDetail(
-                HttpStatus.CONFLICT, "Optimistic Lock Conflict", ex, request);
-        problemDetail.setDetail("Resource was modified by another request");
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(problemDetail);
+        var response = buildErrorResponse(HttpStatus.CONFLICT, "Optimistic Lock Conflict", ex, request);
+        Objects.requireNonNull(response.getBody()).setDetail("Resource was modified by another request");
+        return response;
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ProblemDetail> handleDataIntegrityViolation(
             DataIntegrityViolationException ex, HttpServletRequest request) {
-        ProblemDetail problemDetail = createBaseProblemDetail(
-                HttpStatus.CONFLICT, "Data Integrity Violation", ex, request);
-        problemDetail.setDetail("Operation violates a data integrity constraint (e.g. referenced by other records)");
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(problemDetail);
+        var response = buildErrorResponse(HttpStatus.CONFLICT, "Data Integrity Violation", ex, request);
+        Objects.requireNonNull(response.getBody())
+                .setDetail("Operation violates a data integrity constraint (e.g. referenced by other records)");
+        return response;
     }
 
     @ExceptionHandler(PessimisticLockingFailureException.class)
     public ResponseEntity<ProblemDetail> handlePessimisticLock(
             PessimisticLockingFailureException ex, HttpServletRequest request) {
-        ProblemDetail problemDetail = createBaseProblemDetail(
-                HttpStatus.CONFLICT, "Resource Busy", ex, request);
-        problemDetail.setDetail("Resource is temporarily locked, please retry");
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(problemDetail);
+        var response = buildErrorResponse(HttpStatus.CONFLICT, "Resource Busy", ex, request);
+        Objects.requireNonNull(response.getBody()).setDetail("Resource is temporarily locked, please retry");
+        return response;
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -285,7 +283,6 @@ public class ExceptionTranslator {
     }
 
     private void addDebugInfo(ProblemDetail detail, Exception ex) {
-        if (detail == null || ex == null) return;
         if (isDevProfile) {
             detail.setProperty("exception", ex.getClass().getName());
             String fullStackTrace = ExceptionUtils.getStackTrace(ex);

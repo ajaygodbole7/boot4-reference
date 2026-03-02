@@ -20,12 +20,12 @@ import static org.mockito.Mockito.when;
  * Unit tests for {@link ProductService}.
  */
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("unchecked") // Mockito any(Specification.class) returns raw type
 class ProductServiceTest {
 
     @Mock
     private ProductRepository productRepository;
 
-    @SuppressWarnings("unchecked")
     private ProductService createService(int defaultPageSize, int maxPageSize) {
         ApplicationProperties properties = new ApplicationProperties();
         properties.getPagination().setDefaultPageSize(defaultPageSize);
