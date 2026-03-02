@@ -28,6 +28,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
@@ -92,6 +93,15 @@ public class ExceptionTranslator {
         ProblemDetail problemDetail = createBaseProblemDetail(
                 HttpStatus.CONFLICT, "Optimistic Lock Conflict", ex, request);
         problemDetail.setDetail("Resource was modified by another request");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problemDetail);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ProblemDetail> handleDataIntegrityViolation(
+            DataIntegrityViolationException ex, HttpServletRequest request) {
+        ProblemDetail problemDetail = createBaseProblemDetail(
+                HttpStatus.CONFLICT, "Data Integrity Violation", ex, request);
+        problemDetail.setDetail("Operation violates a data integrity constraint (e.g. referenced by other records)");
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problemDetail);
     }
 

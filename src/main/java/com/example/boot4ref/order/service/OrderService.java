@@ -48,6 +48,7 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final OutboxPublisher outboxPublisher;
     private final int defaultPageSize;
+    private final int maxPageSize;
 
     public OrderService(OrderRepository orderRepository,
                         ProductRepository productRepository,
@@ -57,6 +58,7 @@ public class OrderService {
         this.productRepository = productRepository;
         this.outboxPublisher = outboxPublisher;
         this.defaultPageSize = properties.getPagination().getDefaultPageSize();
+        this.maxPageSize = properties.getPagination().getMaxPageSize();
     }
 
     /**
@@ -173,7 +175,7 @@ public class OrderService {
         Specification<Order> spec = OrderSpecifications.byStatus(status)
                 .and(OrderSpecifications.keysetAfter(afterId));
 
-        int pageSize = (limit != null && limit > 0) ? limit : defaultPageSize;
+        int pageSize = (limit != null && limit > 0) ? Math.min(limit, maxPageSize) : defaultPageSize;
 
         return orderRepository.findAll(spec,
                         PageRequest.of(0, pageSize, Sort.by(Sort.Direction.ASC, "id")))

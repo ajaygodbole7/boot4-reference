@@ -381,7 +381,7 @@ class OrderControllerTest {
     }
 
     @Test
-    void shouldReturn500WhenNonIdempotencyConstraintViolation() throws Exception {
+    void shouldReturn409WhenNonIdempotencyConstraintViolation() throws Exception {
         var cause = new ConstraintViolationException("fk violation", null, "order_lines_product_id_fkey");
         when(orderService.create(any(OrderCreateRequest.class), eq("some-key")))
                 .thenThrow(new DataIntegrityViolationException("constraint", cause));
@@ -392,6 +392,7 @@ class OrderControllerTest {
                         .content("""
                                 {"items":[{"productId":1,"quantity":2}]}
                                 """))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Data Integrity Violation"));
     }
 }

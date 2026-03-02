@@ -14,6 +14,25 @@ Spring Boot 4 / Java 25 reference backend.
 | Testing | JUnit 5 + Mockito + Testcontainers + datasource-proxy |
 | Build | Maven, multi-stage Docker, AOT/native profiles |
 
+## Domain Model
+
+A product catalog with order management. Two aggregates: **Product** and **Order**.
+
+**Products** follow a lifecycle: DRAFT → ACTIVE → DISCONTINUED. Only ACTIVE products can be ordered. DRAFT products can be deleted (cleanup before publishing). Products with order history are never deleted — they're discontinued instead. The DELETE endpoint exists for housekeeping, not business operations.
+
+**Orders** are immutable once placed. They follow a fulfillment lifecycle: PLACED → CONFIRMED → SHIPPED → DELIVERED, with cancellation possible from PLACED or CONFIRMED. Cancelling an order restores stock. There is no "delete order" operation — cancelled is the terminal state.
+
+**Stock** is decremented atomically at order creation under pessimistic locks (sorted by PK to prevent deadlocks). Price is snapshotted at order time — the order records what the customer paid, not the current catalog price.
+
+**Scope boundaries** (intentional):
+
+- No authentication / authorization — this is an API patterns reference, not a security reference
+- No rate limiting — infrastructure concern (reverse proxy / API gateway)
+- No API versioning — added when breaking changes happen, not speculatively
+- No cache headers — product data is mutable (price, stock, status); caching requires domain-specific TTL decisions
+- No soft-delete — hard-delete on DRAFT products only; the lifecycle state machine handles everything else
+- Virtual threads enabled (`spring.threads.virtual.enabled=true`) — Java 25 with JEP 491 eliminates `synchronized` pinning
+
 ## Prerequisites
 
 - Java 25 (Eclipse Temurin recommended)
@@ -41,7 +60,7 @@ The API is available at `http://localhost:8080`. Management endpoints (health, m
 
 ```
 src/main/java/com/example/boot4ref/
-├── common/          # Base entity, exceptions, ExceptionTranslator, Faker fixtures
+├── common/          # Base entity, exceptions, ExceptionTranslator, dev data seeder
 ├── config/          # ApplicationProperties, RetryConfiguration
 ├── product/         # Product domain: entity, CRUD, lifecycle, filtering, pagination
 ├── order/           # Order domain: entity, lifecycle, stock, idempotency, locking

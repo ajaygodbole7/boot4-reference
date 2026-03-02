@@ -43,8 +43,15 @@ public class ApplicationProperties {
         @Min(1) @Max(100)
         private Integer defaultPageSize = 20;
 
+        @NotNull
+        @Min(1) @Max(1000)
+        private Integer maxPageSize = 100;
+
         public Integer getDefaultPageSize() { return defaultPageSize; }
         public void setDefaultPageSize(Integer defaultPageSize) { this.defaultPageSize = defaultPageSize; }
+
+        public Integer getMaxPageSize() { return maxPageSize; }
+        public void setMaxPageSize(Integer maxPageSize) { this.maxPageSize = maxPageSize; }
     }
 
     public static class Outbox {

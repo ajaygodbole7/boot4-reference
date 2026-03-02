@@ -42,10 +42,12 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final int defaultPageSize;
+    private final int maxPageSize;
 
     public ProductService(ProductRepository productRepository, ApplicationProperties properties) {
         this.productRepository = productRepository;
         this.defaultPageSize = properties.getPagination().getDefaultPageSize();
+        this.maxPageSize = properties.getPagination().getMaxPageSize();
     }
 
     /**
@@ -74,7 +76,7 @@ public class ProductService {
                 .and(ProductSpecifications.maxPrice(maxPrice))
                 .and(ProductSpecifications.keysetAfter(afterId));
 
-        int pageSize = (limit != null && limit > 0) ? limit : defaultPageSize;
+        int pageSize = (limit != null && limit > 0) ? Math.min(limit, maxPageSize) : defaultPageSize;
 
         return productRepository.findAll(spec,
                         PageRequest.of(0, pageSize, Sort.by(Sort.Direction.ASC, "id")))
