@@ -115,10 +115,11 @@
     |                               |         exp. backoff+jitter)
     |                               |            |               |
     |                               |        success → PROCESSED |
-    |                               |        failure → stay      |
-    |                               |          PENDING, abort    |
-    |                               |          batch, retry next |
-    |                               |          poll cycle        |</code></pre>
+    |                               |        failure → increment |
+    |                               |          retryCount,       |
+    |                               |          continue batch.   |
+    |                               |          After maxRetry →  |
+    |                               |          FAILED            |</code></pre>
 
 <hr>
 
@@ -242,8 +243,8 @@ With our approach, the answer is always the same: if the database committed, bot
 <ul>
   <li><strong>OutboxPublisher</strong> (<code>outbox/OutboxPublisher.java</code>) — Builds CloudEvents 1.0 payload (native SDK), inserts into <code>outbox_events</code>. No <code>@Transactional</code> of its own — inherits the caller's transaction</li>
   <li><strong>OutboxPoller</strong> (<code>outbox/OutboxPoller.java</code>) — <code>@Scheduled</code> every 1 second. <code>SELECT ... FOR UPDATE SKIP LOCKED</code> ensures parallel pollers claim different rows</li>
-  <li><strong>KafkaEventPublisher</strong> (<code>outbox/KafkaEventPublisher.java</code>) — Extracted as separate <code>@Component</code> so <code>@Retryable</code> fires through AOP proxy. 3 attempts with exponential backoff and jitter (<code>delay=200ms, multiplier=2</code>). On failure after retries, the exception propagates to the poller — no <code>@Recover</code>, no FAILED status</li>
-  <li><strong>Cleanup job</strong> — Hourly, deletes PROCESSED entries older than 7 days</li>
+  <li><strong>KafkaEventPublisher</strong> (<code>outbox/KafkaEventPublisher.java</code>) — Extracted as separate <code>@Component</code> so <code>@Retryable</code> fires through AOP proxy. 3 attempts with exponential backoff and jitter (<code>delay=200ms, multiplier=2</code>). On failure after retries, the exception propagates to the poller which increments <code>retryCount</code>; after <code>maxRetryCount</code> (default 5) poll-cycle failures, the event is marked FAILED</li>
+  <li><strong>Cleanup job</strong> — Deletes PROCESSED entries older than <code>app.outbox.retention-days</code> (default 7) every <code>app.outbox.cleanup-interval-ms</code> (default 1 hour)</li>
 </ul>
 
 <h3>SKIP LOCKED Explained</h3>
@@ -298,7 +299,7 @@ With our approach, the answer is always the same: if the database committed, bot
 <tbody>
 <tr><td>JVM crash before commit</td><td>Both domain write and outbox write roll back. No inconsistency.</td></tr>
 <tr><td>JVM crash after commit</td><td>Both durable. Poller picks up the outbox row on next cycle.</td></tr>
-<tr><td>Kafka down</td><td><code>@Retryable</code> retries 3 times with exponential backoff + jitter. If still down, the event stays PENDING and the batch aborts. The outbox table IS the retry buffer — events accumulate as PENDING rows and drain automatically when Kafka recovers. No manual intervention needed.</td></tr>
+<tr><td>Kafka down</td><td><code>@Retryable</code> retries 3 times with exponential backoff + jitter. If still down, the poller increments the event's <code>retryCount</code> and continues to the next event in the batch. After <code>maxRetryCount</code> (default 5) poll-cycle failures, the event is marked FAILED. The outbox table IS the retry buffer — events accumulate as PENDING rows and drain automatically when Kafka recovers. No manual intervention needed.</td></tr>
 <tr><td>Poller crash mid-batch</td><td>SKIP LOCKED rows revert to PENDING (lock released on disconnect). Next poll picks them up.</td></tr>
 <tr><td>Duplicate delivery</td><td>Possible (at-least-once). Consumers must be idempotent. CloudEvents <code>id</code> field enables deduplication.</td></tr>
 </tbody>
@@ -311,9 +312,9 @@ Kafka network I/O. With 50 events and a healthy Kafka (10ms per send), that's ~5
 connection hold time. This is a deliberate trade-off for simplicity:</p>
 
 <ul>
-  <li><strong>Two states only:</strong> PENDING and PROCESSED. No transient IN_PROGRESS state, no stale-event sweeper, no partial-batch orphan recovery.</li>
-  <li><strong>Crash at any point = consistent:</strong> before commit → TX rollback → all events stay PENDING. After commit → all events are PROCESSED. No window of ambiguity.</li>
-  <li><strong>Break-on-failure bounds the worst case:</strong> if Kafka is down, the batch aborts after one event's retry cycle (~1.4s with backoff), not after 50 × 10s = 500s.</li>
+  <li><strong>Three states:</strong> PENDING, PROCESSED, and FAILED. No transient IN_PROGRESS state, no stale-event sweeper, no partial-batch orphan recovery. Events that exceed <code>maxRetryCount</code> are marked FAILED and excluded from future polls.</li>
+  <li><strong>Crash at any point = consistent:</strong> before commit → TX rollback → all events revert. After commit → events are PROCESSED or have updated retry counts. No window of ambiguity.</li>
+  <li><strong>Continue-on-failure:</strong> a Kafka failure on one event does not abort the batch. The poller increments <code>retryCount</code>, logs a warning, and moves to the next event. This prevents one poison-pill event from blocking the entire batch.</li>
 </ul>
 
 <div class="callout">

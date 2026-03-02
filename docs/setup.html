@@ -133,7 +133,7 @@
   <tr><th>Service</th><th>Image</th><th>Port</th><th>Purpose</th></tr>
   <tr><td>PostgreSQL</td><td><code>postgres:16-alpine</code></td><td>5432</td><td>Application database</td></tr>
   <tr><td>Kafka</td><td><code>apache/kafka-native:4.2.0</code></td><td>9092</td><td>Event messaging (KRaft, ~52 MB)</td></tr>
-  <tr><td>OTel Collector</td><td><code>otel/opentelemetry-collector-contrib</code></td><td>4318</td><td>Receives OTLP traces + metrics</td></tr>
+  <tr><td>OTel Collector</td><td><code>otel/opentelemetry-collector-contrib</code></td><td>4317, 4318, 8889</td><td>Receives OTLP (gRPC + HTTP), exports metrics on 8889</td></tr>
   <tr><td>Prometheus</td><td><code>prom/prometheus</code></td><td>9090</td><td>Metrics storage + queries</td></tr>
   <tr><td>Tempo</td><td><code>grafana/tempo</code></td><td>3200</td><td>Distributed trace storage</td></tr>
   <tr><td>Loki</td><td><code>grafana/loki</code></td><td>3100</td><td>Log aggregation</td></tr>
@@ -158,7 +158,7 @@ docker compose -f infra/docker-compose.yml logs -f</code></pre>
 <h3>Spring Profiles</h3>
 <table>
   <tr><th>Profile</th><th>Purpose</th><th>Activate</th></tr>
-  <tr><td><code>dev</code></td><td>Enables DevDataSeeder (Faker fixtures), verbose error details in responses</td><td><code>-Dspring-boot.run.profiles=dev</code></td></tr>
+  <tr><td><code>dev</code></td><td>Enables DevDataSeeder (hardcoded sample data), verbose error details in responses</td><td><code>-Dspring-boot.run.profiles=dev</code></td></tr>
   <tr><td><code>test</code></td><td>Activated by <code>@ActiveProfiles("test")</code> in <code>AbstractIntegrationTest</code>. Testcontainers provides PostgreSQL.</td><td><code>@ActiveProfiles("test")</code></td></tr>
   <tr><td>(default)</td><td>Production-like. No dev data, no stack traces in errors.</td><td>No profile flag</td></tr>
 </table>
@@ -183,7 +183,7 @@ docker compose -f infra/docker-compose.yml logs -f</code></pre>
   <tr><td><code>SPRING_DATASOURCE_PASSWORD</code></td><td><code>boot4pass</code></td><td>Database password</td></tr>
   <tr><td><code>KAFKA_BOOTSTRAP_SERVERS</code></td><td><code>localhost:9092</code></td><td>Kafka broker address</td></tr>
   <tr><td><code>MANAGEMENT_OTLP_TRACING_ENDPOINT</code></td><td><code>http://localhost:4318/v1/traces</code></td><td>OTLP trace endpoint (OTel Collector)</td></tr>
-  <tr><td><code>STRUCTURED_LOGGING</code></td><td>(unset)</td><td>Set to <code>true</code> for ECS JSON console logging</td></tr>
+  <tr><td><code>LOGGING_STRUCTURED_FORMAT_CONSOLE</code></td><td>(unset)</td><td>Set to <code>ecs</code> for ECS JSON console logging (Spring relaxed binding)</td></tr>
 </table>
 
 </main>

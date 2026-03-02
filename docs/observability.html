@@ -77,7 +77,7 @@
 <h3>Key Points</h3>
 <ul>
   <li><strong>Three pillars:</strong> logs (Loki), traces (Tempo), metrics (Prometheus) — all accessible from Grafana at <code>localhost:3000</code></li>
-  <li><strong>OpenTelemetry Collector</strong> receives OTLP traces from the app and exports to Tempo and Prometheus</li>
+  <li><strong>OpenTelemetry Collector</strong> receives all three OTLP signals — traces → Tempo, metrics → Prometheus exporter, logs → Loki</li>
   <li><strong>Structured logging</strong> uses ECS JSON format when <code>STRUCTURED_LOGGING=true</code> (in Docker); default console format for local dev</li>
   <li><strong>MDC correlation IDs</strong> (<code>traceId</code>, <code>spanId</code>) in every log line — click through to traces in Tempo</li>
   <li>Actuator exposes <code>/actuator/prometheus</code> on management port <strong>8081</strong> — separate from the API port</li>
@@ -104,19 +104,22 @@
 
 <h2 id="pipeline">Pipeline Overview</h2>
 
-<pre><code>  Spring Boot App (port 8080)
+<pre><code>  Spring Boot App (port 8080, management 8081)
     │
-    ├── OTLP traces ──→ OTel Collector (port 4318) ──→ Tempo (port 3200)
-    │                           │
-    │                           └──→ Prometheus (port 9090) ←── scrape /actuator/prometheus (port 8081)
+    ├── OTLP traces  ──→ OTel Collector (port 4318) ──→ Tempo (gRPC 4317)
+    ├── OTLP metrics ──→ OTel Collector ──→ Prometheus exporter (:8889)
+    ├── OTLP logs    ──→ OTel Collector ──→ Loki (port 3100)
     │
-    ├── Structured logs (stdout) ──→ Docker logs ──→ Loki (port 3100)
-    │
-    └── Actuator metrics ──→ Prometheus scrape ──→ Grafana (port 3000)
-                                                        │
-                                                        ├── Tempo datasource (traces)
-                                                        ├── Loki datasource (logs)
-                                                        └── Prometheus datasource (metrics)</code></pre>
+    └── /actuator/prometheus (:8081) ──→ Prometheus scrape
+                                                │
+    Prometheus (port 9090) ◄── scrapes ─────────┤
+        ├── otel-collector:8889  (OTLP metrics re-exported)
+        └── app:8081/actuator/prometheus  (Actuator metrics)
+                │
+          Grafana (port 3000)
+              ├── Tempo datasource (traces)
+              ├── Loki datasource (logs)
+              └── Prometheus datasource (metrics)</code></pre>
 
 <hr>
 
@@ -177,10 +180,11 @@ management.otlp.tracing.endpoint=http://localhost:4318/v1/traces</code></pre>
 
 <h3>OTel Collector</h3>
 <p><strong>File:</strong> <code>infra/otel-collector.yml</code></p>
-<p>The collector receives OTLP data over HTTP (port 4318) and exports to:</p>
+<p>The collector receives OTLP data over HTTP (port 4318) and routes each signal to its backend:</p>
 <ul>
-  <li><strong>Tempo</strong> — full traces for distributed trace visualization</li>
-  <li><strong>Prometheus</strong> — span metrics (request duration histograms, error counts) via the <code>spanmetrics</code> connector</li>
+  <li><strong>Traces → Tempo</strong> — full traces for distributed trace visualization</li>
+  <li><strong>Metrics → Prometheus exporter</strong> — OTLP metrics re-exported in Prometheus format on <code>:8889</code>, scraped by Prometheus</li>
+  <li><strong>Logs → Loki</strong> — forwarded via OTLP/HTTP to <code>loki:3100/otlp</code></li>
 </ul>
 
 <hr>
@@ -219,7 +223,7 @@ management.otlp.tracing.endpoint=http://localhost:4318/v1/traces</code></pre>
 
 <p>Every log line includes <code>traceId</code> and <code>spanId</code> via MDC (Mapped Diagnostic Context):</p>
 
-<pre><code>logging.pattern.correlation=[${spring.application.name:},%mdc{traceId:-},%mdc{spanId:-}]</code></pre>
+<pre><code>logging.pattern.correlation=[${spring.application.name:},%X{traceId:-},%X{spanId:-}]</code></pre>
 
 <p>Debugging workflow:</p>
 <ol>
@@ -259,7 +263,7 @@ Actuator on a separate port (8081) because:
 
 <table>
   <tr><th>Component</th><th>Image</th><th>Port</th><th>Role</th></tr>
-  <tr><td>OTel Collector</td><td><code>otel/opentelemetry-collector-contrib</code></td><td>4318</td><td>Receives OTLP, exports to Tempo + Prometheus</td></tr>
+  <tr><td>OTel Collector</td><td><code>otel/opentelemetry-collector-contrib</code></td><td>4318</td><td>Receives OTLP; traces → Tempo, metrics → Prometheus exporter (:8889), logs → Loki</td></tr>
   <tr><td>Tempo</td><td><code>grafana/tempo</code></td><td>3200</td><td>Distributed trace storage and query</td></tr>
   <tr><td>Loki</td><td><code>grafana/loki</code></td><td>3100</td><td>Log aggregation and search</td></tr>
   <tr><td>Prometheus</td><td><code>prom/prometheus</code></td><td>9090</td><td>Metrics storage, scrapes app + OTel Collector</td></tr>
@@ -270,7 +274,7 @@ Actuator on a separate port (8081) because:
 <p><strong>File:</strong> <code>infra/prometheus.yml</code></p>
 <p>Prometheus scrapes two targets every 10 seconds:</p>
 <ul>
-  <li><code>otel-collector:8889/metrics</code> — span metrics from the OTel Collector</li>
+  <li><code>otel-collector:8889/metrics</code> — OTLP metrics from the app, re-exported in Prometheus format</li>
   <li><code>host.docker.internal:8081/actuator/prometheus</code> — application metrics from Spring Actuator</li>
 </ul>
 

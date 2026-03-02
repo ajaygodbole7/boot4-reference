@@ -101,7 +101,7 @@
   <li>Timestamps are ISO-8601 UTC (<code>Instant</code>).</li>
   <li>Prices use <code>BigDecimal</code> with up to 4 decimal places.</li>
   <li>Status transitions are explicit via <code>POST .../status</code> endpoints.</li>
-  <li>Keyset pagination uses <code>afterCreatedAt</code> + <code>afterId</code> cursors.</li>
+  <li>Keyset pagination uses <code>afterId</code> cursor (TSID-based, monotonically increasing).</li>
   <li>Optimistic locking: stale writes return <span class="status s4xx">409</span>.</li>
 </ul>
 
@@ -152,8 +152,7 @@
     <tr><td><code>status</code></td><td>String</td><td>No</td><td>Filter by status: <code>DRAFT</code>, <code>ACTIVE</code>, <code>DISCONTINUED</code></td></tr>
     <tr><td><code>minPrice</code></td><td>BigDecimal</td><td>No</td><td>Minimum price (inclusive)</td></tr>
     <tr><td><code>maxPrice</code></td><td>BigDecimal</td><td>No</td><td>Maximum price (inclusive)</td></tr>
-    <tr><td><code>afterCreatedAt</code></td><td>Instant</td><td>No</td><td>Keyset cursor: <code>createdAt</code> of last seen product</td></tr>
-    <tr><td><code>afterId</code></td><td>Long</td><td>No</td><td>Keyset cursor: <code>id</code> of last seen product</td></tr>
+    <tr><td><code>afterId</code></td><td>Long</td><td>No</td><td>Keyset cursor: <code>id</code> of last seen product (TSID, monotonically increasing)</td></tr>
     <tr><td><code>limit</code></td><td>Integer</td><td>No</td><td>Max results (default 20)</td></tr>
   </table>
   <h4>Response</h4>
@@ -308,7 +307,7 @@
   <p><span class="status s2xx">201</span> &mdash; <code>OrderResponse</code> + <code>Location</code> header</p>
   <p><span class="status s4xx">400</span> &mdash; Validation error</p>
   <p><span class="status s4xx">404</span> &mdash; Product not found</p>
-  <p><span class="status s4xx">409</span> &mdash; Duplicate idempotency key (returns original order)</p>
+  <p><span class="status s2xx">201</span> &mdash; Duplicate idempotency key (returns existing order with Location header — transparent to caller)</p>
   <p><span class="status s4xx">422</span> &mdash; Discontinued product or insufficient stock</p>
 </div>
 
@@ -344,8 +343,7 @@
   <table>
     <tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr>
     <tr><td><code>status</code></td><td>String</td><td>No</td><td>Filter: <code>PLACED</code>, <code>CONFIRMED</code>, <code>SHIPPED</code>, <code>DELIVERED</code>, <code>CANCELLED</code></td></tr>
-    <tr><td><code>afterCreatedAt</code></td><td>Instant</td><td>No</td><td>Keyset cursor: <code>createdAt</code> of last seen order</td></tr>
-    <tr><td><code>afterId</code></td><td>Long</td><td>No</td><td>Keyset cursor: <code>id</code> of last seen order</td></tr>
+    <tr><td><code>afterId</code></td><td>Long</td><td>No</td><td>Keyset cursor: <code>id</code> of last seen order (TSID, monotonically increasing)</td></tr>
     <tr><td><code>limit</code></td><td>Integer</td><td>No</td><td>Max results (default 20)</td></tr>
   </table>
   <h4>Response</h4>
@@ -398,8 +396,8 @@ performance degradation of <code>OFFSET</code> on large tables and provides stab
 <h3>How to paginate</h3>
 <ol>
   <li>Request the first page: <code>GET /api/products?limit=20</code></li>
-  <li>Take the <code>createdAt</code> and <code>id</code> of the <strong>last</strong> item in the response</li>
-  <li>Request the next page: <code>GET /api/products?afterCreatedAt={lastCreatedAt}&amp;afterId={lastId}&amp;limit=20</code></li>
+  <li>Take the <code>id</code> of the <strong>last</strong> item in the response</li>
+  <li>Request the next page: <code>GET /api/products?afterId={lastId}&amp;limit=20</code></li>
   <li>Repeat until the response is empty or has fewer items than <code>limit</code></li>
 </ol>
 

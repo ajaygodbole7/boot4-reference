@@ -127,7 +127,7 @@
 <h2 id="unit-tests">Deep Dive: Unit Tests</h2>
 
 <h3>Service Tests</h3>
-<p><strong>Pattern:</strong> <code>@ExtendWith(MockitoExtension.class)</code> with <code>@Mock</code> and <code>@InjectMocks</code>.</p>
+<p><strong>Pattern:</strong> <code>@ExtendWith(MockitoExtension.class)</code> with <code>@Mock</code> and manual constructor injection via factory methods.</p>
 <p><strong>Examples:</strong> <code>ProductServiceTest</code>, <code>OrderServiceTest</code>, <code>OutboxPublisherTest</code></p>
 <p>Repository layer is mocked. Tests check:</p>
 <ul>
@@ -156,7 +156,7 @@
   <li>HTTP status codes per endpoint</li>
   <li>JSON response structure and field values</li>
   <li>Bean validation (empty body, missing fields, invalid values → 400)</li>
-  <li>Content-Type enforcement (PATCH requires <code>application/merge-patch+json</code>)</li>
+  <li>Content-Type enforcement (PATCH requires <code>application/json</code>)</li>
   <li><code>Location</code> header on 201 responses</li>
 </ul>
 
@@ -181,7 +181,7 @@
 <h2 id="integration-tests">Deep Dive: Full-Stack Integration Tests</h2>
 
 <p><strong>Pattern:</strong> <code>@SpringBootTest</code> with full application context + Testcontainers</p>
-<p><strong>Examples:</strong> <code>OrderServiceIT</code>, <code>ProductServiceIT</code>, <code>OutboxIT</code></p>
+<p><strong>Examples:</strong> <code>OutboxIT</code>, <code>Boot4RefApplicationIT</code></p>
 
 <p>Full service → repository → database path with real transactions. ACID properties, cascade behavior, outbox end-to-end.</p>
 
@@ -218,10 +218,14 @@ Stock is a classic race condition. Without pessimistic locking, two concurrent o
   <li>Tests reset the counter, perform an operation, then assert the exact query count</li>
 </ol>
 
-<pre><code>// Example: verify that fetching an order with lines is exactly 1 query (JOIN FETCH)
+<pre><code>// Example from OrderRepositoryIT: verify JOIN FETCH is exactly 1 query
 QueryCountHolder.clear();
-orderService.findById(orderId);
-assertThat(QueryCountHolder.getGrandTotal().getSelect()).isEqualTo(1);</code></pre>
+Order found = orderRepository.findByIdWithLines(saved.getId()).orElseThrow();
+assertThat(found.getOrderLines()).hasSize(1);
+long selectCount = QueryCountHolder.getGrandTotal().getSelect();
+assertThat(selectCount)
+        .as("findByIdWithLines should execute exactly 1 SELECT (JOIN FETCH)")
+        .isEqualTo(1);</code></pre>
 
 <hr>
 
@@ -230,7 +234,7 @@ assertThat(QueryCountHolder.getGrandTotal().getSelect()).isEqualTo(1);</code></p
 <table>
   <tr><th>Class</th><th>Purpose</th></tr>
   <tr><td><code>AbstractIntegrationTest</code></td><td>Base class for all <code>*IT</code> tests. Imports <code>TestcontainersConfiguration</code> (<code>@ServiceConnection</code>) and <code>DataSourceProxyConfiguration</code>. Activates <code>test</code> profile.</td></tr>
-  <tr><td><code>TestcontainersConfiguration</code></td><td>Shared PostgreSQL container definition. Reused across all ITs (container starts once).</td></tr>
+  <tr><td><code>TestcontainersConfiguration</code></td><td>Shared PostgreSQL and Kafka container definitions. Reused across all ITs (containers start once). Kafka bootstrap servers injected via <code>DynamicPropertyRegistrar</code>.</td></tr>
   <tr><td><code>TestBoot4RefApplication</code></td><td>Test bootstrap class. Run <code>TestBoot4RefApplication.main()</code> from IDE to start the app with Testcontainers.</td></tr>
   <tr><td><code>DataSourceProxyConfiguration</code></td><td>Test-scoped config that wraps DataSource for query counting.</td></tr>
 </table>

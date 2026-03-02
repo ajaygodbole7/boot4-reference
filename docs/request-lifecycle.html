@@ -143,9 +143,10 @@ public ResponseEntity&lt;OrderResponse&gt; createOrder(
     try {
         created = orderService.create(request, idempotencyKey);
     } catch (DataIntegrityViolationException ex) {
-        // Race: concurrent request with same key won the INSERT.
-        // TX is rolled back — re-fetch the winner's order.
-        if (idempotencyKey != null) {
+        // Only recover from idempotency key constraint violations.
+        // Other constraint violations (FK, null) propagate to ExceptionTranslator (409).
+        if (idempotencyKey != null &amp;&amp; isIdempotencyKeyViolation(ex)) {
+            log.warn("Idempotency key race detected for key={}: {}", idempotencyKey, ex.getMessage());
             created = orderService.findByIdempotencyKey(idempotencyKey);
         } else {
             throw ex;
@@ -157,8 +158,10 @@ public ResponseEntity&lt;OrderResponse&gt; createOrder(
 
 <p>The <code>catch (DataIntegrityViolationException)</code> handles a race condition: two concurrent requests
 with the same idempotency key both pass the <code>findByIdempotencyKey</code> check, both attempt to INSERT,
-and the loser gets a unique constraint violation. Rather than returning 500, the controller re-fetches
-the winner's order and returns it with 201 — making the idempotency contract transparent to the caller.</p>
+and the loser gets a unique constraint violation. The <code>isIdempotencyKeyViolation()</code> guard checks the
+constraint name — only idempotency key violations are recovered; FK or null constraint violations
+propagate to <code>ExceptionTranslator</code> (409). On recovery, the controller re-fetches the winner's order
+and returns it with 201 — making the idempotency contract transparent to the caller.</p>
 
 <p>Spring's <code>DispatcherServlet</code> has already:</p>
 <ul>
@@ -181,21 +184,29 @@ the winner's order and returns it with 201 — making the idempotency contract t
 
 <p><strong>File:</strong> <code>product/repository/ProductRepository.java</code></p>
 
-<p>Product IDs from the request are <strong>sorted</strong> before locking. This prevents deadlocks when concurrent
-orders reference the same products in different order.</p>
+<p>Order line items are <strong>sorted by product ID in Java</strong> before locking. Each product is locked
+individually via <code>ProductRepository.findWithLockById(Long id)</code> — a single-ID method
+annotated with <code>@Lock(LockModeType.PESSIMISTIC_WRITE)</code> and a 3-second lock timeout.
+Consistent lock ordering prevents deadlocks when concurrent orders reference the same products.</p>
 
-<pre><code>SELECT p FROM Product p WHERE p.id IN :ids ORDER BY p.id
--- with @Lock(LockModeType.PESSIMISTIC_WRITE)</code></pre>
+<pre><code>// OrderService.create() — sort first, then lock one-by-one
+List&lt;OrderLineRequest&gt; sortedItems = request.items().stream()
+        .sorted(Comparator.comparing(OrderLineRequest::productId))
+        .toList();
 
-<p>The <code>SELECT ... FOR UPDATE</code> blocks other transactions from modifying these rows until our transaction commits.</p>
+for (OrderLineRequest item : sortedItems) {
+    Product product = productRepository.findWithLockById(item.productId())  // SELECT ... FOR UPDATE
+            .orElseThrow(() -&gt; new ProductNotFoundException(item.productId()));
+    // validate + decrement stock
+}</code></pre>
 
 <h3 id="step-validation"><span class="layer-tag layer-service">SERVICE</span> 4. Business Validation</h3>
 
 <p>With locks held, the service validates each line item:</p>
 <ul>
   <li>Product must exist (otherwise <code>ProductNotFoundException</code> → 404)</li>
-  <li>Product must not be <code>DISCONTINUED</code> (otherwise <code>BusinessRuleException</code> → 422)</li>
-  <li>Product stock must be &ge; requested quantity (otherwise <code>BusinessRuleException</code> → 422)</li>
+  <li>Product must not be <code>DISCONTINUED</code> (otherwise <code>DiscontinuedProductException</code> → 422)</li>
+  <li>Product stock must be &ge; requested quantity (otherwise <code>InsufficientStockException</code> → 422)</li>
 </ul>
 
 <p>These checks happen <em>after</em> locking. Without the lock, another transaction could decrement stock or discontinue the product between request arrival and validation.</p>
