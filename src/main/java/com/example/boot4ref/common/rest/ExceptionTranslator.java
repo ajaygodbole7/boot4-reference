@@ -263,6 +263,8 @@ public class ExceptionTranslator {
         ProblemDetail problemDetail = createBaseProblemDetail(status, title, ex, request);
         if (status.is4xxClientError()) {
             log.warn("{} {} -> {} {}", request.getMethod(), request.getRequestURI(), status.value(), title);
+        } else if (status.is5xxServerError()) {
+            log.error("{} {} -> {} {}", request.getMethod(), request.getRequestURI(), status.value(), title);
         }
         return ResponseEntity.status(status).body(problemDetail);
     }

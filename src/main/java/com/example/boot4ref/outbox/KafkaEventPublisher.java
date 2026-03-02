@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
  * <p>Only active when the outbox poller is enabled (disabled in tests).
  */
 @Component
-@ConditionalOnProperty(name = "outbox.poller.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "app.outbox.poller.enabled", havingValue = "true", matchIfMissing = true)
 public class KafkaEventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(KafkaEventPublisher.class);

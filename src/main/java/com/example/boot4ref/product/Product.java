@@ -28,7 +28,7 @@ import java.math.BigDecimal;
 @Setter
 public class Product extends AbstractAuditingEntity {
 
-    @Column(name = "name", nullable = false, length = 255)
+    @Column(name = "name", nullable = false, length = 100)
     private String name;
 
     @Column(name = "description", columnDefinition = "TEXT")

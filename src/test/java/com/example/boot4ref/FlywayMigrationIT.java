@@ -21,7 +21,7 @@ class FlywayMigrationIT extends AbstractIntegrationTest {
     @Test
     void shouldRunAllMigrationsSuccessfully() {
         var applied = flyway.info().applied();
-        assertThat(applied).hasSize(4);
+        assertThat(applied).hasSize(5);
     }
 
     // --- Products table ---

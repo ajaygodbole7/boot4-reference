@@ -57,21 +57,18 @@ class AbstractAuditingEntityTest {
         entity.prePersist();
         var originalCreatedAt = entity.getCreatedAt();
 
-        // Ensure clock advances
-        try { Thread.sleep(2); } catch (InterruptedException ignored) {}
-
         entity.prePersist();
 
         assertThat(entity.getCreatedAt()).isEqualTo(originalCreatedAt);
     }
 
     @Test
-    void shouldUpdateUpdatedAtOnPreUpdate() {
+    void shouldUpdateUpdatedAtOnPreUpdate() throws InterruptedException {
         entity.prePersist();
         var originalUpdatedAt = entity.getUpdatedAt();
 
-        // Ensure clock advances
-        try { Thread.sleep(2); } catch (InterruptedException ignored) {}
+        // 15ms ensures Instant.now() advances beyond timer resolution on all platforms
+        Thread.sleep(15);
 
         entity.preUpdate();
 
@@ -82,8 +79,6 @@ class AbstractAuditingEntityTest {
     void shouldNotChangeCreatedAtOnPreUpdate() {
         entity.prePersist();
         var originalCreatedAt = entity.getCreatedAt();
-
-        try { Thread.sleep(2); } catch (InterruptedException ignored) {}
 
         entity.preUpdate();
 

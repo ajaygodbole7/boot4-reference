@@ -30,7 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
  * poll interval will catch up across multiple cycles.
  */
 @Component
-@ConditionalOnProperty(name = "outbox.poller.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "app.outbox.poller.enabled", havingValue = "true", matchIfMissing = true)
 public class OutboxPoller {
 
     private static final Logger log = LoggerFactory.getLogger(OutboxPoller.class);
