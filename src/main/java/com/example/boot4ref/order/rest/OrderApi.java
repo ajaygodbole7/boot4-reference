@@ -30,7 +30,7 @@ public interface OrderApi {
             @ApiResponse(responseCode = "201", description = "Order created (or existing order returned if idempotency key matches)"),
             @ApiResponse(responseCode = "400", description = "Validation error or missing idempotency key"),
             @ApiResponse(responseCode = "404", description = "Product not found"),
-            @ApiResponse(responseCode = "422", description = "Business rule violation (discontinued product, insufficient stock)")
+            @ApiResponse(responseCode = "422", description = "Business rule violation (non-ACTIVE product, insufficient stock, duplicate product IDs)")
     })
     @PostMapping("/api/orders")
     @NonNull ResponseEntity<OrderResponse> createOrder(

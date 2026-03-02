@@ -190,6 +190,30 @@ class ProductControllerTest {
                 .andExpect(jsonPath("$.title").value("Validation Error"));
     }
 
+    @Test
+    void shouldReturn400WhenCreatePriceExceedsDigitsPrecision() throws Exception {
+        mockMvc.perform(post("/api/products")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Widget","description":"desc","price":12345678901234567.99,"stock":5}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Validation Error"))
+                .andExpect(jsonPath("$.errors[?(@.field == 'price')]").exists());
+    }
+
+    @Test
+    void shouldReturn400WhenPatchPriceExceedsDigitsPrecision() throws Exception {
+        mockMvc.perform(patch("/api/products/42")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"price":1.123456}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Validation Error"))
+                .andExpect(jsonPath("$.errors[?(@.field == 'price')]").exists());
+    }
+
     // =========== GET /api/products ===========
 
     @Test
@@ -420,6 +444,17 @@ class ProductControllerTest {
         mockMvc.perform(delete("/api/products/99"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Resource Not Found"));
+    }
+
+    @Test
+    void shouldReturn409WhenDeletingActiveProduct() throws Exception {
+        doThrow(new ProductConflictException("Cannot delete product 42 in ACTIVE status"))
+                .when(productService).delete(42L);
+
+        mockMvc.perform(delete("/api/products/42"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/409"))
+                .andExpect(jsonPath("$.title").value("Resource Conflict"));
     }
 
     // =========== Status transition: POST /api/products/{id}/status ===========

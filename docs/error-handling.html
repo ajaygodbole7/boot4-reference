@@ -94,7 +94,7 @@
   <tr><th>Exception</th><th>HTTP Status</th><th>When</th></tr>
   <tr><td><code>ResourceNotFoundException</code></td><td><span class="status s4xx">404</span> Not Found</td><td>Product or order ID does not exist</td></tr>
   <tr><td><code>ResourceConflictException</code></td><td><span class="status s4xx">409</span> Conflict</td><td>Invalid status transition (e.g. DRAFT → DISCONTINUED)</td></tr>
-  <tr><td><code>BusinessRuleException</code></td><td><span class="status s4xx">422</span> Unprocessable Entity</td><td>Discontinued product in order, insufficient stock</td></tr>
+  <tr><td><code>BusinessRuleException</code></td><td><span class="status s4xx">422</span> Unprocessable Entity</td><td>Non-ACTIVE product in order, insufficient stock, duplicate product IDs</td></tr>
   <tr><td><code>ServiceUnavailableException</code></td><td><span class="status s5xx">503</span> Service Unavailable</td><td>Downstream dependency unreachable</td></tr>
   <tr><td><code>ObjectOptimisticLockingFailureException</code></td><td><span class="status s4xx">409</span> Conflict</td><td>Stale version on PUT/PATCH (concurrent update)</td></tr>
   <tr><td><code>PessimisticLockingFailureException</code></td><td><span class="status s4xx">409</span> Conflict</td><td>Lock timeout waiting for a row held by another transaction (e.g., concurrent order placement)</td></tr>
@@ -167,8 +167,9 @@
   └── OrderConflictException
 
   BusinessRuleException (abstract)
-  ├── DiscontinuedProductException
-  └── InsufficientStockException</code></pre>
+  ├── UnorderableProductException
+  ├── InsufficientStockException
+  └── DuplicateLineItemException</code></pre>
 
 <p>Domain packages define specific subclasses (e.g., <code>ProductNotFoundException extends ResourceNotFoundException</code>).
 The <code>ExceptionTranslator</code> catches the base types, so subclasses are handled automatically.</p>

@@ -81,10 +81,11 @@ public interface ProductApi {
             @Parameter(description = "Product ID") @PathVariable @NonNull Long id,
             @Valid @RequestBody @NonNull ProductPatchRequest request);
 
-    @Operation(summary = "Delete a product")
+    @Operation(summary = "Delete a product (DRAFT only)")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Product deleted"),
-            @ApiResponse(responseCode = "404", description = "Product not found")
+            @ApiResponse(responseCode = "404", description = "Product not found"),
+            @ApiResponse(responseCode = "409", description = "Product is not in DRAFT status")
     })
     @DeleteMapping("/api/products/{id}")
     @NonNull ResponseEntity<Void> deleteProduct(

@@ -3,7 +3,9 @@ package com.example.boot4ref.order.rest;
 import com.example.boot4ref.common.rest.ExceptionTranslator;
 import com.example.boot4ref.config.ApplicationProperties;
 import com.example.boot4ref.order.OrderStatus;
-import com.example.boot4ref.order.exception.DiscontinuedProductException;
+import com.example.boot4ref.order.exception.UnorderableProductException;
+import com.example.boot4ref.product.ProductStatus;
+import com.example.boot4ref.order.exception.DuplicateLineItemException;
 import com.example.boot4ref.order.exception.InsufficientStockException;
 import com.example.boot4ref.order.exception.OrderConflictException;
 import com.example.boot4ref.order.exception.OrderNotFoundException;
@@ -320,7 +322,7 @@ class OrderControllerTest {
     @Test
     void shouldReturn422WhenOrderingDiscontinuedProduct() throws Exception {
         when(orderService.create(any(OrderCreateRequest.class), isNull()))
-                .thenThrow(new DiscontinuedProductException(1L));
+                .thenThrow(new UnorderableProductException(1L, ProductStatus.DISCONTINUED));
 
         mockMvc.perform(post("/api/orders")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -331,7 +333,41 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/422"))
                 .andExpect(jsonPath("$.title").value("Business Rule Violation"))
                 .andExpect(jsonPath("$.detail").value(
-                        "Product 1 is discontinued and cannot be ordered"));
+                        "Product 1 is DISCONTINUED and cannot be ordered"));
+    }
+
+    @Test
+    void shouldReturn422WhenOrderingDraftProduct() throws Exception {
+        when(orderService.create(any(OrderCreateRequest.class), isNull()))
+                .thenThrow(new UnorderableProductException(1L, ProductStatus.DRAFT));
+
+        mockMvc.perform(post("/api/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"items":[{"productId":1,"quantity":1}]}
+                                """))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/422"))
+                .andExpect(jsonPath("$.title").value("Business Rule Violation"))
+                .andExpect(jsonPath("$.detail").value(
+                        "Product 1 is DRAFT and cannot be ordered"));
+    }
+
+    @Test
+    void shouldReturn422WhenOrderHasDuplicateProductIds() throws Exception {
+        when(orderService.create(any(OrderCreateRequest.class), isNull()))
+                .thenThrow(new DuplicateLineItemException(1L));
+
+        mockMvc.perform(post("/api/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"items":[{"productId":1,"quantity":2},{"productId":1,"quantity":3}]}
+                                """))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/422"))
+                .andExpect(jsonPath("$.title").value("Business Rule Violation"))
+                .andExpect(jsonPath("$.detail").value(
+                        "Duplicate product ID 1 in order items"));
     }
 
     // =========== Filtering ===========

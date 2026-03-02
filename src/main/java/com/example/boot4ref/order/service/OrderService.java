@@ -5,7 +5,8 @@ import com.example.boot4ref.order.Order;
 import com.example.boot4ref.order.OrderLine;
 import com.example.boot4ref.order.OrderStatus;
 import com.example.boot4ref.order.event.DomainEvent;
-import com.example.boot4ref.order.exception.DiscontinuedProductException;
+import com.example.boot4ref.order.exception.DuplicateLineItemException;
+import com.example.boot4ref.order.exception.UnorderableProductException;
 import com.example.boot4ref.order.exception.InsufficientStockException;
 import com.example.boot4ref.order.exception.OrderConflictException;
 import com.example.boot4ref.order.exception.OrderNotFoundException;
@@ -22,7 +23,9 @@ import com.example.boot4ref.product.exception.ProductNotFoundException;
 import com.example.boot4ref.product.repository.ProductRepository;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -70,7 +73,7 @@ public class OrderService {
      *   <li>Idempotency key — returns existing order if key matches</li>
      *   <li>PESSIMISTIC_WRITE lock on products, lock in PK order</li>
      *   <li>Insufficient stock → 422</li>
-     *   <li>Discontinued product → 422</li>
+     *   <li>Non-ACTIVE product → 422</li>
      *   <li>Total computed from lines</li>
      * </ul>
      */
@@ -95,14 +98,22 @@ public class OrderService {
                 .sorted(Comparator.comparing(OrderLineRequest::productId))
                 .toList();
 
+        // Reject duplicate product IDs before acquiring locks
+        Set<Long> seen = new HashSet<>();
+        for (OrderLineRequest item : sortedItems) {
+            if (!seen.add(item.productId())) {
+                throw new DuplicateLineItemException(item.productId());
+            }
+        }
+
         for (OrderLineRequest item : sortedItems) {
             // PESSIMISTIC_WRITE lock — timeout defined by ProductRepository.LOCK_TIMEOUT_MS
             Product product = productRepository.findWithLockById(item.productId())
                     .orElseThrow(() -> new ProductNotFoundException(item.productId()));
 
-            // Can't order a DISCONTINUED product
-            if (product.getStatus() == ProductStatus.DISCONTINUED) {
-                throw new DiscontinuedProductException(product.getId());
+            // Only ACTIVE products can be ordered
+            if (product.getStatus() != ProductStatus.ACTIVE) {
+                throw new UnorderableProductException(product.getId(), product.getStatus());
             }
 
             // Insufficient stock check

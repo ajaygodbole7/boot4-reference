@@ -1,6 +1,7 @@
 package com.example.boot4ref.product.rest;
 
 import com.example.boot4ref.product.ProductConstraints;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -30,6 +31,9 @@ public record ProductUpdateRequest(
 
         @NotNull(message = "Price is required")
         @Positive(message = "Price must be positive")
+        @Digits(integer = ProductConstraints.PRICE_INTEGER_DIGITS,
+                fraction = ProductConstraints.PRICE_FRACTION_DIGITS,
+                message = "Price must have at most 15 integer and 4 fraction digits")
         BigDecimal price,
 
         @NotNull(message = "Stock is required")

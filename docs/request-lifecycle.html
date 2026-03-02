@@ -109,7 +109,7 @@
     │
     ├─ Idempotency check                ──→ 201 if duplicate key (returns existing order)
     ├─ Lock products (SELECT FOR UPDATE, sorted by PK)
-    ├─ Validate: product active? stock sufficient?  ──→ 422 if violated
+    ├─ Validate: no duplicate product IDs? active? stock?  ──→ 422 if violated
     ├─ Decrement stock, snapshot prices
     ├─ Save order + order lines
     ├─ OutboxPublisher.publish()         ──→ same transaction
@@ -202,10 +202,12 @@ for (OrderLineRequest item : sortedItems) {
 
 <h3 id="step-validation"><span class="layer-tag layer-service">SERVICE</span> 4. Business Validation</h3>
 
+<p>Before locking, the service rejects duplicate product IDs across line items (<code>DuplicateLineItemException</code> → 422).</p>
+
 <p>With locks held, the service validates each line item:</p>
 <ul>
   <li>Product must exist (otherwise <code>ProductNotFoundException</code> → 404)</li>
-  <li>Product must not be <code>DISCONTINUED</code> (otherwise <code>DiscontinuedProductException</code> → 422)</li>
+  <li>Product must be <code>ACTIVE</code> (otherwise <code>UnorderableProductException</code> → 422)</li>
   <li>Product stock must be &ge; requested quantity (otherwise <code>InsufficientStockException</code> → 422)</li>
 </ul>
 

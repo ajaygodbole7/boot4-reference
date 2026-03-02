@@ -9,6 +9,8 @@ public final class ProductConstraints {
     public static final int NAME_MIN_LENGTH = 3;
     public static final int NAME_MAX_LENGTH = 100;
     public static final int DESCRIPTION_MAX_LENGTH = 500;
+    public static final int PRICE_INTEGER_DIGITS = 15;
+    public static final int PRICE_FRACTION_DIGITS = 4;
 
     private ProductConstraints() {}
 }

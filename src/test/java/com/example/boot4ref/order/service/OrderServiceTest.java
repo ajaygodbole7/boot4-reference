@@ -1,9 +1,18 @@
 package com.example.boot4ref.order.service;
 
 import com.example.boot4ref.config.ApplicationProperties;
+import com.example.boot4ref.order.exception.DuplicateLineItemException;
+import com.example.boot4ref.order.exception.UnorderableProductException;
 import com.example.boot4ref.order.repository.OrderRepository;
+import com.example.boot4ref.order.rest.OrderCreateRequest;
+import com.example.boot4ref.order.rest.OrderLineRequest;
 import com.example.boot4ref.outbox.OutboxPublisher;
+import com.example.boot4ref.product.Product;
+import com.example.boot4ref.product.ProductStatus;
 import com.example.boot4ref.product.repository.ProductRepository;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -14,6 +23,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -78,5 +88,33 @@ class OrderServiceTest {
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
         verify(orderRepository).findAll(any(Specification.class), captor.capture());
         assertThat(captor.getValue().getPageSize()).isEqualTo(50);
+    }
+
+    @Test
+    void shouldRejectOrderForDraftProduct() {
+        OrderService service = createService(20, 100);
+        Product draft = Product.builder()
+                .name("Draft Widget").price(new BigDecimal("10.00"))
+                .stock(100).status(ProductStatus.DRAFT).build();
+        when(productRepository.findWithLockById(1L)).thenReturn(Optional.of(draft));
+
+        OrderCreateRequest request = new OrderCreateRequest(
+                List.of(new OrderLineRequest(1L, 1)));
+
+        assertThatThrownBy(() -> service.create(request, null))
+                .isInstanceOf(UnorderableProductException.class)
+                .hasMessageContaining("DRAFT");
+    }
+
+    @Test
+    void shouldRejectOrderWithDuplicateProductIds() {
+        OrderService service = createService(20, 100);
+
+        OrderCreateRequest request = new OrderCreateRequest(
+                List.of(new OrderLineRequest(1L, 2), new OrderLineRequest(1L, 3)));
+
+        assertThatThrownBy(() -> service.create(request, null))
+                .isInstanceOf(DuplicateLineItemException.class)
+                .hasMessageContaining("1");
     }
 }

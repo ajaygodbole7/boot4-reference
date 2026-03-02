@@ -172,13 +172,18 @@ public class ProductService {
     }
 
     /**
-     * Deletes a product by ID.
+     * Deletes a product by ID. Only DRAFT products can be deleted.
      *
      * @throws ProductNotFoundException if not found
+     * @throws ProductConflictException if product is not in DRAFT status
      */
     @Transactional
     public void delete(Long id) {
         Product product = findOrThrow(id);
+        if (product.getStatus() != ProductStatus.DRAFT) {
+            throw new ProductConflictException(
+                    "Cannot delete product " + id + " in " + product.getStatus() + " status");
+        }
         productRepository.delete(product);
         log.debug("Deleted product id={}", id);
     }

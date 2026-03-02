@@ -1,7 +1,12 @@
 package com.example.boot4ref.product.service;
 
 import com.example.boot4ref.config.ApplicationProperties;
+import com.example.boot4ref.product.Product;
+import com.example.boot4ref.product.ProductStatus;
+import com.example.boot4ref.product.exception.ProductConflictException;
 import com.example.boot4ref.product.repository.ProductRepository;
+import java.math.BigDecimal;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -12,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -70,5 +76,31 @@ class ProductServiceTest {
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
         verify(productRepository).findAll(any(Specification.class), captor.capture());
         assertThat(captor.getValue().getPageSize()).isEqualTo(50);
+    }
+
+    @Test
+    void shouldRejectDeleteOfActiveProduct() {
+        ProductService service = createService(20, 100);
+        Product active = Product.builder()
+                .name("Widget").price(new BigDecimal("10.00"))
+                .stock(5).status(ProductStatus.ACTIVE).build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(active));
+
+        assertThatThrownBy(() -> service.delete(1L))
+                .isInstanceOf(ProductConflictException.class)
+                .hasMessageContaining("ACTIVE");
+    }
+
+    @Test
+    void shouldRejectDeleteOfDiscontinuedProduct() {
+        ProductService service = createService(20, 100);
+        Product discontinued = Product.builder()
+                .name("Widget").price(new BigDecimal("10.00"))
+                .stock(0).status(ProductStatus.DISCONTINUED).build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(discontinued));
+
+        assertThatThrownBy(() -> service.delete(1L))
+                .isInstanceOf(ProductConflictException.class)
+                .hasMessageContaining("DISCONTINUED");
     }
 }

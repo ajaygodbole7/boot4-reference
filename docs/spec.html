@@ -131,7 +131,7 @@
   <tr><td><span class="status s4xx">405</span></td><td>Method Not Allowed</td><td>Wrong HTTP method for endpoint</td></tr>
   <tr><td><span class="status s4xx">409</span></td><td>Resource Conflict</td><td>Invalid status transition, optimistic lock conflict, pessimistic lock timeout</td></tr>
   <tr><td><span class="status s4xx">415</span></td><td>Unsupported Media Type</td><td>Wrong Content-Type (expected <code>application/json</code>)</td></tr>
-  <tr><td><span class="status s4xx">422</span></td><td>Business Rule Violation</td><td>Discontinued product, insufficient stock</td></tr>
+  <tr><td><span class="status s4xx">422</span></td><td>Business Rule Violation</td><td>Non-ACTIVE product, insufficient stock, duplicate product IDs in order</td></tr>
   <tr><td><span class="status s5xx">500</span></td><td>Internal Server Error</td><td>Unexpected error</td></tr>
   <tr><td><span class="status s5xx">503</span></td><td>Service Unavailable</td><td>Downstream service unavailable</td></tr>
 </table>
@@ -238,10 +238,11 @@
 
 <div class="endpoint-box" id="delete-product">
   <h3><span class="method delete">DELETE</span> <code>/api/products/{id}</code></h3>
-  <p>Hard-delete a product.</p>
+  <p>Hard-delete a product. Only DRAFT products can be deleted &mdash; ACTIVE and DISCONTINUED products return 409.</p>
   <h4>Responses</h4>
   <p><span class="status s2xx">204</span> &mdash; No content</p>
   <p><span class="status s4xx">404</span> &mdash; Product not found</p>
+  <p><span class="status s4xx">409</span> &mdash; Product is not in DRAFT status</p>
 </div>
 
 <div class="endpoint-box" id="transition-product">
@@ -298,7 +299,9 @@
   </ul>
   <h4>Business Rules</h4>
   <ul>
-    <li>Product must exist and not be <code>DISCONTINUED</code> &mdash; otherwise <span class="status s4xx">422</span></li>
+    <li>Product must exist &mdash; otherwise <span class="status s4xx">404</span></li>
+    <li>Product must be <code>ACTIVE</code> &mdash; otherwise <span class="status s4xx">422</span></li>
+    <li>No duplicate product IDs across line items &mdash; otherwise <span class="status s4xx">422</span></li>
     <li>Product stock must be sufficient &mdash; otherwise <span class="status s4xx">422</span></li>
     <li>Price is snapshotted at order time (not a live reference)</li>
     <li>Stock is decremented atomically under pessimistic lock</li>
@@ -308,7 +311,7 @@
   <p><span class="status s4xx">400</span> &mdash; Validation error</p>
   <p><span class="status s4xx">404</span> &mdash; Product not found</p>
   <p><span class="status s2xx">201</span> &mdash; Duplicate idempotency key (returns existing order with Location header — transparent to caller)</p>
-  <p><span class="status s4xx">422</span> &mdash; Discontinued product or insufficient stock</p>
+  <p><span class="status s4xx">422</span> &mdash; Non-ACTIVE product, insufficient stock, or duplicate product IDs</p>
 </div>
 
 <div class="endpoint-box" id="get-order">
