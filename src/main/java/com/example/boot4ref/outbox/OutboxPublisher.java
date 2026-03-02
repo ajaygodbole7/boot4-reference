@@ -45,7 +45,7 @@ public class OutboxPublisher {
                 .payload(payload)
                 .build();
 
-        outboxEventRepository.save(outboxEvent);
+        outboxEventRepository.saveAndFlush(outboxEvent);
         log.debug("Outbox entry created: type={}, orderId={}", eventType, event.orderId());
     }
 

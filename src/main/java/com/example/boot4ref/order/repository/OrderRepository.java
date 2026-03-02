@@ -27,8 +27,10 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
     Optional<Order> findByIdWithLines(Long id);
 
     /**
-     * Finds an existing order by idempotency key.
+     * Finds an existing order by idempotency key with line items and products.
+     * JOIN FETCH prevents N+1 when toResponse() accesses lazy associations.
      */
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.orderLines ol LEFT JOIN FETCH ol.product WHERE o.idempotencyKey = :idempotencyKey")
     Optional<Order> findByIdempotencyKey(String idempotencyKey);
 
     /**

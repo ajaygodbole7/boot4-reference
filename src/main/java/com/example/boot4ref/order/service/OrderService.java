@@ -136,7 +136,7 @@ public class OrderService {
 
         // Compute total from lines
         order.computeTotal();
-        Order saved = orderRepository.save(order);
+        Order saved = orderRepository.saveAndFlush(order);
 
         // Outbox: insert event in same transaction
         outboxPublisher.publish(new DomainEvent.OrderPlaced(
@@ -218,7 +218,7 @@ public class OrderService {
         }
 
         order.setStatus(newStatus);
-        Order saved = orderRepository.save(order);
+        Order saved = orderRepository.saveAndFlush(order);
 
         // Outbox: insert transition event in same transaction
         outboxPublisher.publish(createTransitionEvent(saved.getId(), newStatus));

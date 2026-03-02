@@ -45,7 +45,7 @@ class OutboxPublisherTest {
     @Test
     void shouldResolveOrderPlacedEventType() {
         var event = new DomainEvent.OrderPlaced(1L, Instant.now(), BigDecimal.TEN, 2);
-        when(outboxEventRepository.save(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
+        when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
         publisher.publish(event);
 
@@ -55,7 +55,7 @@ class OutboxPublisherTest {
     @Test
     void shouldResolveOrderConfirmedEventType() {
         var event = new DomainEvent.OrderConfirmed(1L, Instant.now());
-        when(outboxEventRepository.save(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
+        when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
         publisher.publish(event);
 
@@ -65,7 +65,7 @@ class OutboxPublisherTest {
     @Test
     void shouldResolveOrderShippedEventType() {
         var event = new DomainEvent.OrderShipped(1L, Instant.now());
-        when(outboxEventRepository.save(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
+        when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
         publisher.publish(event);
 
@@ -75,7 +75,7 @@ class OutboxPublisherTest {
     @Test
     void shouldResolveOrderDeliveredEventType() {
         var event = new DomainEvent.OrderDelivered(1L, Instant.now());
-        when(outboxEventRepository.save(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
+        when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
         publisher.publish(event);
 
@@ -85,7 +85,7 @@ class OutboxPublisherTest {
     @Test
     void shouldResolveOrderCancelledEventType() {
         var event = new DomainEvent.OrderCancelled(1L, Instant.now());
-        when(outboxEventRepository.save(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
+        when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
         publisher.publish(event);
 
@@ -97,7 +97,7 @@ class OutboxPublisherTest {
     @Test
     void shouldSetAggregateTypeToOrder() {
         var event = new DomainEvent.OrderPlaced(42L, Instant.now(), BigDecimal.ONE, 1);
-        when(outboxEventRepository.save(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
+        when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
         publisher.publish(event);
 
@@ -107,7 +107,7 @@ class OutboxPublisherTest {
     @Test
     void shouldSetAggregateIdFromEvent() {
         var event = new DomainEvent.OrderPlaced(42L, Instant.now(), BigDecimal.ONE, 1);
-        when(outboxEventRepository.save(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
+        when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
         publisher.publish(event);
 
@@ -117,7 +117,7 @@ class OutboxPublisherTest {
     @Test
     void shouldSetPendingStatus() {
         var event = new DomainEvent.OrderPlaced(1L, Instant.now(), BigDecimal.ONE, 1);
-        when(outboxEventRepository.save(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
+        when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
         publisher.publish(event);
 
@@ -129,7 +129,7 @@ class OutboxPublisherTest {
     @Test
     void shouldProduceCloudEventsPayloadWithSpecVersion() {
         var event = new DomainEvent.OrderPlaced(1L, Instant.now(), BigDecimal.TEN, 3);
-        when(outboxEventRepository.save(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
+        when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
         publisher.publish(event);
 
@@ -141,7 +141,7 @@ class OutboxPublisherTest {
     @Test
     void shouldProduceCloudEventsPayloadWithCorrectType() {
         var event = new DomainEvent.OrderConfirmed(99L, Instant.now());
-        when(outboxEventRepository.save(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
+        when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
         publisher.publish(event);
 
@@ -152,7 +152,7 @@ class OutboxPublisherTest {
     @Test
     void shouldProduceCloudEventsPayloadWithSource() {
         var event = new DomainEvent.OrderPlaced(55L, Instant.now(), BigDecimal.ONE, 1);
-        when(outboxEventRepository.save(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
+        when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
         publisher.publish(event);
 
@@ -163,7 +163,7 @@ class OutboxPublisherTest {
     @Test
     void shouldProduceCloudEventsPayloadWithDataContentType() {
         var event = new DomainEvent.OrderPlaced(1L, Instant.now(), BigDecimal.ONE, 1);
-        when(outboxEventRepository.save(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
+        when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
         publisher.publish(event);
 
@@ -175,7 +175,7 @@ class OutboxPublisherTest {
     @Test
     void shouldProduceCloudEventsPayloadWithData() {
         var event = new DomainEvent.OrderPlaced(1L, Instant.now(), new BigDecimal("50.00"), 3);
-        when(outboxEventRepository.save(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
+        when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
         publisher.publish(event);
 
@@ -186,10 +186,10 @@ class OutboxPublisherTest {
     @Test
     void shouldSaveOutboxEventToRepository() {
         var event = new DomainEvent.OrderPlaced(1L, Instant.now(), BigDecimal.ONE, 1);
-        when(outboxEventRepository.save(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
+        when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
         publisher.publish(event);
 
-        verify(outboxEventRepository).save(eventCaptor.getValue());
+        verify(outboxEventRepository).saveAndFlush(eventCaptor.getValue());
     }
 }

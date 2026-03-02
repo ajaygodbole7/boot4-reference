@@ -24,12 +24,12 @@ import static org.mockito.Mockito.verify;
  * Integration test proving @Retryable on ProductService.update() and patch()
  * fires on ObjectOptimisticLockingFailureException and retries in a new transaction.
  *
- * <p>Strategy: spy on ProductRepository to intercept save() calls and always throw
+ * <p>Strategy: spy on ProductRepository to intercept saveAndFlush() calls and always throw
  * ObjectOptimisticLockingFailureException. Verify the number of retry attempts:
- * - Without @Retryable: save() is called once (exception propagates immediately).
- * - With @Retryable(maxAttempts=3): save() is called 3 times before giving up.
+ * - Without @Retryable: saveAndFlush() is called once (exception propagates immediately).
+ * - With @Retryable(maxAttempts=3): saveAndFlush() is called 3 times before giving up.
  *
- * <p>RED: verify(times(3)) fails — only 1 save() call without @Retryable.
+ * <p>RED: verify(times(3)) fails — only 1 saveAndFlush() call without @Retryable.
  * GREEN: verify(times(3)) passes — @Retryable fires, exhausting all 3 attempts.
  */
 class ProductServiceRetryIT extends AbstractIntegrationTest {
@@ -47,8 +47,8 @@ class ProductServiceRetryIT extends AbstractIntegrationTest {
      * Proves update() attempts all @Retryable maxAttempts on repeated OptimisticLockFailure.
      *
      * <p>Expected call count:
-     * - RED (no @Retryable): 1 call — fails with times(3) assertion.
-     * - GREEN (@Retryable maxAttempts=3): 3 calls — passes.
+     * - RED (no @Retryable): 1 call — fails with times(3) assertion
+     * - GREEN (@Retryable maxAttempts=3): 3 calls — passes
      */
     @Test
     void update_shouldAttemptRetries_onRepeatedOptimisticLockFailure() {
@@ -65,10 +65,10 @@ class ProductServiceRetryIT extends AbstractIntegrationTest {
         assertThat(saved).isNotNull();
         Mockito.reset(productRepository);
 
-        // Spy: ALL save() calls throw — exhausts all retry attempts
+        // Spy: ALL saveAndFlush() calls throw — exhausts all retry attempts
         Mockito.doAnswer(invocation -> {
             throw new ObjectOptimisticLockingFailureException(Product.class, saved.getId());
-        }).when(productRepository).save(any(Product.class));
+        }).when(productRepository).saveAndFlush(any(Product.class));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
                 "Will Not Succeed",
@@ -81,17 +81,17 @@ class ProductServiceRetryIT extends AbstractIntegrationTest {
         assertThatThrownBy(() -> productService.update(saved.getId(), request))
                 .isInstanceOf(ObjectOptimisticLockingFailureException.class);
 
-        // GREEN (with @Retryable maxAttempts=3): save() called 3 times
-        // RED (without @Retryable): save() called 1 time — this assertion fails in RED
-        verify(productRepository, times(3)).save(any(Product.class));
+        // GREEN (with @Retryable maxAttempts=3): saveAndFlush() called 3 times
+        // RED (without @Retryable): saveAndFlush() called 1 time — this assertion fails in RED
+        verify(productRepository, times(3)).saveAndFlush(any(Product.class));
     }
 
     /**
      * Proves patch() attempts all @Retryable maxAttempts on repeated OptimisticLockFailure.
      *
      * <p>Expected call count:
-     * - RED (no @Retryable): 1 call — fails with times(3) assertion.
-     * - GREEN (@Retryable maxAttempts=3): 3 calls — passes.
+     * - RED (no @Retryable): 1 call — fails with times(3) assertion
+     * - GREEN (@Retryable maxAttempts=3): 3 calls — passes
      */
     @Test
     void patch_shouldAttemptRetries_onRepeatedOptimisticLockFailure() {
@@ -108,10 +108,10 @@ class ProductServiceRetryIT extends AbstractIntegrationTest {
         assertThat(saved).isNotNull();
         Mockito.reset(productRepository);
 
-        // Spy: ALL save() calls throw
+        // Spy: ALL saveAndFlush() calls throw
         Mockito.doAnswer(invocation -> {
             throw new ObjectOptimisticLockingFailureException(Product.class, saved.getId());
-        }).when(productRepository).save(any(Product.class));
+        }).when(productRepository).saveAndFlush(any(Product.class));
 
         ProductPatchRequest patchRequest = new ProductPatchRequest(
                 "Patch Will Not Succeed",
@@ -124,8 +124,8 @@ class ProductServiceRetryIT extends AbstractIntegrationTest {
         assertThatThrownBy(() -> productService.patch(saved.getId(), patchRequest))
                 .isInstanceOf(ObjectOptimisticLockingFailureException.class);
 
-        // GREEN (with @Retryable maxAttempts=3): save() called 3 times
-        // RED (without @Retryable): save() called 1 time — this assertion fails in RED
-        verify(productRepository, times(3)).save(any(Product.class));
+        // GREEN (with @Retryable maxAttempts=3): saveAndFlush() called 3 times
+        // RED (without @Retryable): saveAndFlush() called 1 time — this assertion fails in RED
+        verify(productRepository, times(3)).saveAndFlush(any(Product.class));
     }
 }

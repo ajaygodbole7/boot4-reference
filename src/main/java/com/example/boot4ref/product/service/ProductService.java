@@ -106,7 +106,7 @@ public class ProductService {
                 .stock(request.stock())
                 .status(ProductStatus.DRAFT)
                 .build();
-        Product saved = productRepository.save(product);
+        Product saved = productRepository.saveAndFlush(product);
         log.debug("Created product id={} name={}", saved.getId(), saved.getName());
         return toResponse(saved);
     }
@@ -116,7 +116,7 @@ public class ProductService {
      * Status transitions must use {@link #transition(Long, ProductStatus)}.
      *
      * <p>{@code @Retryable} intercepts {@link ObjectOptimisticLockingFailureException}
-     * thrown by {@code save()} when a concurrent writer advanced {@code @Version}.
+     * thrown by {@code saveAndFlush()} when a concurrent writer advanced {@code @Version}.
      * Each retry is a fresh {@code @Transactional} invocation — a new EntityManager
      * is opened, the entity is reloaded with the current version, and the update
      * is re-attempted. After {@code maxAttempts} exhausted, the exception propagates
@@ -134,7 +134,7 @@ public class ProductService {
         product.setDescription(request.description());
         product.setPrice(request.price());
         product.setStock(request.stock());
-        Product saved = productRepository.save(product);
+        Product saved = productRepository.saveAndFlush(product);
         log.debug("Updated product id={}", saved.getId());
         return toResponse(saved);
     }
@@ -166,7 +166,7 @@ public class ProductService {
         if (request.stock() != null) {
             product.setStock(request.stock());
         }
-        Product saved = productRepository.save(product);
+        Product saved = productRepository.saveAndFlush(product);
         log.debug("Patched product id={}", saved.getId());
         return toResponse(saved);
     }
@@ -204,7 +204,7 @@ public class ProductService {
             );
         }
         product.setStatus(newStatus);
-        Product saved = productRepository.save(product);
+        Product saved = productRepository.saveAndFlush(product);
         log.info("Transitioned product id={} from {} to {}", id, current, newStatus);
         return toResponse(saved);
     }
