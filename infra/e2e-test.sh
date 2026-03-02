@@ -83,7 +83,7 @@ req "GET /api/products/$PRODUCT_ID" "200" "$code"
 
 # Step 3 — PATCH PRODUCT
 section "Step 3: Partial Update Product"
-code=$(http PATCH "$BASE_URL/products/$PRODUCT_ID" '{"description":"Updated via E2E"}' "application/merge-patch+json")
+code=$(http PATCH "$BASE_URL/products/$PRODUCT_ID" '{"description":"Updated via E2E"}')
 req "PATCH /api/products/$PRODUCT_ID" "200" "$code"
 
 # Step 4 — ACTIVATE PRODUCT

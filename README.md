@@ -59,7 +59,7 @@ docs/                # HTML documentation (spec, setup, patterns, testing)
 - **Sealed event hierarchy** — compile-time exhaustiveness for domain events
 - **Pessimistic locking** — deadlock-free stock management (sorted PK acquisition)
 - **Idempotency keys** — at-most-once order creation
-- **Partial updates** — PATCH with `application/merge-patch+json` content type
+- **Partial updates** — PATCH applies non-null fields only
 
 ## Documentation
 

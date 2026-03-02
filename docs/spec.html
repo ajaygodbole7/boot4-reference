@@ -130,7 +130,7 @@
   <tr><td><span class="status s4xx">404</span></td><td>Resource Not Found</td><td>Product or order ID does not exist</td></tr>
   <tr><td><span class="status s4xx">405</span></td><td>Method Not Allowed</td><td>Wrong HTTP method for endpoint</td></tr>
   <tr><td><span class="status s4xx">409</span></td><td>Resource Conflict</td><td>Invalid status transition, optimistic lock conflict, pessimistic lock timeout</td></tr>
-  <tr><td><span class="status s4xx">415</span></td><td>Unsupported Media Type</td><td>Wrong Content-Type (e.g. PATCH without <code>application/merge-patch+json</code>)</td></tr>
+  <tr><td><span class="status s4xx">415</span></td><td>Unsupported Media Type</td><td>Wrong Content-Type (expected <code>application/json</code>)</td></tr>
   <tr><td><span class="status s4xx">422</span></td><td>Business Rule Violation</td><td>Discontinued product, insufficient stock</td></tr>
   <tr><td><span class="status s5xx">500</span></td><td>Internal Server Error</td><td>Unexpected error</td></tr>
   <tr><td><span class="status s5xx">503</span></td><td>Service Unavailable</td><td>Downstream service unavailable</td></tr>
@@ -221,11 +221,11 @@
 
 <div class="endpoint-box" id="patch-product">
   <h3><span class="method patch">PATCH</span> <code>/api/products/{id}</code></h3>
-  <p>Partial update. Only provided fields are updated; omitted fields are unchanged.
-  Uses <code>application/merge-patch+json</code> content type, but note: setting a field to <code>null</code>
-  (to clear it) is not supported — the record-based DTO cannot distinguish absent fields from explicit nulls.</p>
+  <p>Partial update. Only non-null fields in the request body are applied; omitted fields are unchanged.
+  Setting a field to <code>null</code> (to clear it) is not supported — the record-based DTO cannot distinguish
+  absent fields from explicit nulls.</p>
   <h4>Request Body</h4>
-  <p><code>Content-Type: application/merge-patch+json</code></p>
+  <p><code>Content-Type: application/json</code></p>
 <pre><code>{
   "price": 139.99,    // only update price
   "stock": 100        // and stock
@@ -234,7 +234,7 @@
   <p><span class="status s2xx">200</span> &mdash; <code>ProductResponse</code></p>
   <p><span class="status s4xx">404</span> &mdash; Product not found</p>
   <p><span class="status s4xx">409</span> &mdash; Optimistic lock conflict</p>
-  <p><span class="status s4xx">415</span> &mdash; Wrong Content-Type (must be <code>application/merge-patch+json</code>)</p>
+  <p><span class="status s4xx">415</span> &mdash; Wrong Content-Type (must be <code>application/json</code>)</p>
 </div>
 
 <div class="endpoint-box" id="delete-product">
@@ -435,7 +435,7 @@ performance degradation of <code>OFFSET</code> on large tables and provides stab
   <tr><td><code>stock</code></td><td>Integer</td><td>Required, &ge; 0</td></tr>
 </table>
 
-<h3>ProductPatchRequest (JSON Merge Patch)</h3>
+<h3>ProductPatchRequest (Partial Update)</h3>
 <table>
   <tr><th>Field</th><th>Type</th><th>Constraints</th></tr>
   <tr><td><code>name</code></td><td>String</td><td>Optional, 3-100 chars if provided</td></tr>

@@ -35,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Controller tests for {@link ProductController} covering full CRUD, lifecycle transitions,
- * filtering, keyset pagination, PATCH (JSON Merge Patch), and optimistic lock 409.
+ * filtering, keyset pagination, PATCH (partial update), and optimistic lock 409.
  *
  * <p>Uses {@code @WebMvcTest} (Boot 4) with {@code @MockitoBean} (replaces deprecated @MockBean).
  */
@@ -345,7 +345,7 @@ class ProductControllerTest {
         when(productService.patch(eq(42L), any(ProductPatchRequest.class))).thenReturn(patched);
 
         mockMvc.perform(patch("/api/products/42")
-                        .contentType("application/merge-patch+json")
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"Patched Widget"}
                                 """))
@@ -364,7 +364,7 @@ class ProductControllerTest {
         when(productService.patch(eq(42L), any(ProductPatchRequest.class))).thenReturn(patched);
 
         mockMvc.perform(patch("/api/products/42")
-                        .contentType("application/merge-patch+json")
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"price":99.99}
                                 """))
@@ -378,7 +378,7 @@ class ProductControllerTest {
                 .thenThrow(new ProductNotFoundException(99L));
 
         mockMvc.perform(patch("/api/products/99")
-                        .contentType("application/merge-patch+json")
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"Updated"}
                                 """))
@@ -393,7 +393,7 @@ class ProductControllerTest {
                         "Product", 42L));
 
         mockMvc.perform(patch("/api/products/42")
-                        .contentType("application/merge-patch+json")
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"New Name"}
                                 """))

@@ -124,7 +124,7 @@ class OutboxIT extends AbstractIntegrationTest {
 
         // Cleanup should delete entries older than 7 days
         Instant cutoff = Instant.now().minus(7, ChronoUnit.DAYS);
-        int deleted = outboxEventRepository.deleteProcessedBefore(cutoff);
+        int deleted = outboxEventRepository.deleteByStatusBefore(OutboxStatus.PROCESSED, cutoff);
         assertThat(deleted).isEqualTo(1);
 
         assertThat(outboxEventRepository.findAll()).isEmpty();
@@ -201,7 +201,7 @@ class OutboxIT extends AbstractIntegrationTest {
 
         // Cleanup with 7-day cutoff should NOT delete recent entries
         Instant cutoff = Instant.now().minus(7, ChronoUnit.DAYS);
-        int deleted = outboxEventRepository.deleteProcessedBefore(cutoff);
+        int deleted = outboxEventRepository.deleteByStatusBefore(OutboxStatus.PROCESSED, cutoff);
         assertThat(deleted).isZero();
 
         assertThat(outboxEventRepository.findAll()).hasSize(1);

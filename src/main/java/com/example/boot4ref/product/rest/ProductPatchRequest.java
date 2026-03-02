@@ -8,14 +8,12 @@ import java.math.BigDecimal;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Request DTO for JSON Merge Patch (RFC 7396) partial updates to a product.
+ * Request DTO for partial product updates.
  *
  * <p>All fields are optional ({@code @Nullable}). Only non-null fields are applied;
- * null fields leave the existing product value unchanged. This is the merge-patch
- * semantics: the absence of a field in the patch means "do not change this field".
+ * null fields leave the existing product value unchanged.
  *
  * <p>Validation annotations apply only when the field is present (non-null).
- * Content-Type for PATCH requests must be {@code application/merge-patch+json}.
  */
 public record ProductPatchRequest(
         @Nullable

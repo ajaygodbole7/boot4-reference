@@ -15,6 +15,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.doAnswer;
@@ -146,12 +147,12 @@ class OutboxPollerTest {
 
     @Test
     void shouldDelegateCleanupToRepository() {
-        when(outboxEventRepository.deleteProcessedBefore(any(Instant.class))).thenReturn(5);
+        when(outboxEventRepository.deleteByStatusBefore(any(OutboxStatus.class), any(Instant.class))).thenReturn(5);
 
         outboxPoller.cleanup();
 
         ArgumentCaptor<Instant> cutoffCaptor = ArgumentCaptor.forClass(Instant.class);
-        verify(outboxEventRepository).deleteProcessedBefore(cutoffCaptor.capture());
+        verify(outboxEventRepository).deleteByStatusBefore(eq(OutboxStatus.PROCESSED), cutoffCaptor.capture());
         // Cutoff should be roughly 7 days ago
         assertThat(cutoffCaptor.getValue()).isBefore(Instant.now().minusSeconds(6 * 24 * 3600));
     }

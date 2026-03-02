@@ -141,10 +141,6 @@ public class ProductService {
      * Partial update: applies only the non-null fields from the patch request.
      * Fields absent from the request (deserialized as null) are left unchanged.
      *
-     * <p>Note: this is NOT true RFC 7396 JSON Merge Patch — a record DTO cannot
-     * distinguish "field absent" from "field explicitly set to null", so null-clearing
-     * a field is not supported.
-     *
      * <p>{@code @Retryable} provides the same optimistic-lock retry as
      * {@link #update(Long, ProductUpdateRequest)} — see that method for rationale.
      *

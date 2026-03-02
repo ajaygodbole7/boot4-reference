@@ -70,13 +70,13 @@ public interface ProductApi {
             @Parameter(description = "Product ID") @PathVariable @NonNull Long id,
             @Valid @RequestBody @NonNull ProductUpdateRequest request);
 
-    @Operation(summary = "Partially update a product (JSON Merge Patch, RFC 7396)")
+    @Operation(summary = "Partially update a product (non-null fields applied)")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Product patched"),
             @ApiResponse(responseCode = "404", description = "Product not found"),
             @ApiResponse(responseCode = "409", description = "Optimistic lock conflict (stale version)")
     })
-    @PatchMapping(value = "/api/products/{id}", consumes = "application/merge-patch+json")
+    @PatchMapping("/api/products/{id}")
     @NonNull ResponseEntity<ProductResponse> patchProduct(
             @Parameter(description = "Product ID") @PathVariable @NonNull Long id,
             @Valid @RequestBody @NonNull ProductPatchRequest request);
