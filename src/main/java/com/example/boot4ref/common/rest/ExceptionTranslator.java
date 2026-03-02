@@ -89,13 +89,19 @@ public class ExceptionTranslator {
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
     public ResponseEntity<ProblemDetail> handleOptimisticLock(
             ObjectOptimisticLockingFailureException ex, HttpServletRequest request) {
-        return buildErrorResponse(HttpStatus.CONFLICT, "Optimistic Lock Conflict", ex, request);
+        ProblemDetail problemDetail = createBaseProblemDetail(
+                HttpStatus.CONFLICT, "Optimistic Lock Conflict", ex, request);
+        problemDetail.setDetail("Resource was modified by another request");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problemDetail);
     }
 
     @ExceptionHandler(PessimisticLockingFailureException.class)
     public ResponseEntity<ProblemDetail> handlePessimisticLock(
             PessimisticLockingFailureException ex, HttpServletRequest request) {
-        return buildErrorResponse(HttpStatus.CONFLICT, "Resource Busy", ex, request);
+        ProblemDetail problemDetail = createBaseProblemDetail(
+                HttpStatus.CONFLICT, "Resource Busy", ex, request);
+        problemDetail.setDetail("Resource is temporarily locked, please retry");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problemDetail);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -247,6 +253,9 @@ public class ExceptionTranslator {
     private ResponseEntity<ProblemDetail> buildErrorResponse(
             HttpStatus status, String title, Exception ex, HttpServletRequest request) {
         ProblemDetail problemDetail = createBaseProblemDetail(status, title, ex, request);
+        if (status.is4xxClientError()) {
+            log.warn("{} {} -> {} {}", request.getMethod(), request.getRequestURI(), status.value(), title);
+        }
         return ResponseEntity.status(status).body(problemDetail);
     }
 

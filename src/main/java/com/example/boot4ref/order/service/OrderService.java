@@ -162,21 +162,21 @@ public class OrderService {
 
     /**
      * Lists orders with optional filtering and keyset pagination.
+     * TSID IDs are time-ordered, so id alone gives chronological ordering.
      */
     @Transactional(readOnly = true)
     public List<OrderResponse> listFiltered(
             @Nullable OrderStatus status,
-            @Nullable Instant afterCreatedAt,
             @Nullable Long afterId,
             @Nullable Integer limit) {
 
         Specification<Order> spec = OrderSpecifications.byStatus(status)
-                .and(OrderSpecifications.keysetAfter(afterCreatedAt, afterId));
+                .and(OrderSpecifications.keysetAfter(afterId));
 
         int pageSize = (limit != null && limit > 0) ? limit : defaultPageSize;
 
         return orderRepository.findAll(spec,
-                        PageRequest.of(0, pageSize, Sort.by("createdAt", "id")))
+                        PageRequest.of(0, pageSize, Sort.by(Sort.Direction.ASC, "id")))
                 .map(this::toResponse)
                 .getContent();
     }

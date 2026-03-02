@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.time.Instant;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -28,10 +27,9 @@ public interface OrderApi {
 
     @Operation(summary = "Create a new order")
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Order created"),
+            @ApiResponse(responseCode = "201", description = "Order created (or existing order returned if idempotency key matches)"),
             @ApiResponse(responseCode = "400", description = "Validation error or missing idempotency key"),
             @ApiResponse(responseCode = "404", description = "Product not found"),
-            @ApiResponse(responseCode = "409", description = "Duplicate idempotency key (returns original order)"),
             @ApiResponse(responseCode = "422", description = "Business rule violation (discontinued product, insufficient stock)")
     })
     @PostMapping("/api/orders")
@@ -56,7 +54,6 @@ public interface OrderApi {
     @GetMapping("/api/orders")
     @NonNull ResponseEntity<List<OrderResponse>> listOrders(
             @Parameter(description = "Filter by status") @RequestParam(required = false) @Nullable OrderStatus status,
-            @Parameter(description = "Keyset cursor: createdAt of last seen order") @RequestParam(required = false) @Nullable Instant afterCreatedAt,
             @Parameter(description = "Keyset cursor: id of last seen order") @RequestParam(required = false) @Nullable Long afterId,
             @Parameter(description = "Maximum results to return (default 20)") @RequestParam(required = false) @Nullable Integer limit);
 

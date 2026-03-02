@@ -13,6 +13,9 @@ import net.ttddyy.dsproxy.QueryCountHolder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
@@ -118,11 +121,41 @@ class OrderRepositoryIT extends AbstractIntegrationTest {
         Order o2 = orderRepository.save(createSimpleOrder());
         Order o3 = orderRepository.save(createSimpleOrder());
 
-        Specification<Order> afterO1 = OrderSpecifications.keysetAfter(o1.getCreatedAt(), o1.getId());
+        Specification<Order> afterO1 = OrderSpecifications.keysetAfter(o1.getId());
         List<Order> nextPage = orderRepository.findAll(afterO1);
 
         assertThat(nextPage).doesNotContain(o1);
         assertThat(nextPage).contains(o2, o3);
+    }
+
+    @Test
+    void shouldLoadPaginatedOrdersWithoutNPlusOneQueries() {
+        // Create 3 orders, each with a line item referencing a product
+        for (int i = 0; i < 3; i++) {
+            orderRepository.save(createSimpleOrder());
+        }
+        orderRepository.flush();
+        QueryCountHolder.clear();
+
+        // Paginated findAll(spec, pageable) — the path fixed by P0-A @EntityGraph
+        Specification<Order> spec = OrderSpecifications.byStatus(null);
+        Page<Order> page = orderRepository.findAll(spec,
+                PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "id")));
+
+        assertThat(page.getContent()).hasSizeGreaterThanOrEqualTo(3);
+        // Access lazy associations to prove they were eagerly loaded
+        page.getContent().forEach(order -> {
+            assertThat(order.getOrderLines()).isNotEmpty();
+            order.getOrderLines().forEach(line ->
+                    assertThat(line.getProduct().getName()).isNotNull());
+        });
+
+        // Without @EntityGraph: 1 SELECT for orders + N SELECTs for orderLines + N for products
+        // With @EntityGraph: 1 SELECT with LEFT JOIN (plus 1 count query for Page)
+        long selectCount = QueryCountHolder.getGrandTotal().getSelect();
+        assertThat(selectCount)
+                .as("Paginated findAll should use @EntityGraph (expected 2: data + count), got %d", selectCount)
+                .isLessThanOrEqualTo(2);
     }
 
     @Test

@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -206,7 +205,7 @@ class ProductRepositoryIT extends AbstractIntegrationTest {
                 .build());
 
         // Use p1 as cursor — expect p2 and p3 in next page
-        Specification<Product> afterP1 = ProductSpecifications.keysetAfter(p1.getCreatedAt(), p1.getId());
+        Specification<Product> afterP1 = ProductSpecifications.keysetAfter(p1.getId());
         List<Product> nextPage = productRepository.findAll(afterP1);
 
         assertThat(nextPage).doesNotContain(p1);

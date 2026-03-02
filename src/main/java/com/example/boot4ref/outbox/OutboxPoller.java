@@ -16,14 +16,15 @@ import org.springframework.transaction.annotation.Transactional;
  * Publishing is delegated to {@link KafkaEventPublisher} which handles
  * {@code @Retryable} retries for transient blips.
  *
- * <p>If Kafka is unreachable after retries, the event stays PENDING and the batch
- * aborts. The next poll cycle (1s later) retries automatically — the outbox table
- * IS the infinite retry buffer. Events drain when Kafka recovers.
- * Scheduled cleanup deletes processed entries older than 7 days.
+ * <p>On publish failure, the event's retryCount is incremented and the poller
+ * continues to the next event. After {@code maxRetryCount} failures (default 5),
+ * the event is marked FAILED and excluded from future polls by the
+ * {@code WHERE status = 'PENDING'} filter. Scheduled cleanup deletes processed
+ * entries older than the configured retention period.
  *
  * <p><strong>Sizing constraint:</strong> The poll loop holds a DB connection and row locks
  * for the entire batch. Worst-case hold time = {@code BATCH_SIZE × kafka.send.timeout}.
- * With defaults (50 events × 10s timeout = 500s max), ensure HikariCP's
+ * With defaults (10 events × 10s timeout = 100s max), ensure HikariCP's
  * {@code maximumPoolSize} has headroom beyond the poller's connection. For higher
  * throughput or stricter latency targets, reduce {@code BATCH_SIZE} — the 1-second
  * poll interval will catch up across multiple cycles.
@@ -37,6 +38,7 @@ public class OutboxPoller {
     private final OutboxEventRepository outboxEventRepository;
     private final KafkaEventPublisher kafkaEventPublisher;
     private final int batchSize;
+    private final int maxRetryCount;
     private final int retentionDays;
 
     public OutboxPoller(OutboxEventRepository outboxEventRepository,
@@ -45,6 +47,7 @@ public class OutboxPoller {
         this.outboxEventRepository = outboxEventRepository;
         this.kafkaEventPublisher = kafkaEventPublisher;
         this.batchSize = properties.getOutbox().getBatchSize();
+        this.maxRetryCount = properties.getOutbox().getMaxRetryCount();
         this.retentionDays = properties.getOutbox().getRetentionDays();
     }
 
@@ -67,11 +70,15 @@ public class OutboxPoller {
                 event.setProcessedAt(Instant.now());
                 log.debug("Published outbox event id={} type={}", event.getId(), event.getEventType());
             } catch (Exception ex) {
-                // Leave event PENDING — next poll cycle retries automatically.
-                // Break the batch: if Kafka is down, remaining events would also fail.
-                log.warn("Outbox event id={} publish failed, will retry next cycle: {}",
-                        event.getId(), ex.getMessage());
-                break;
+                event.setRetryCount(event.getRetryCount() + 1);
+                if (event.getRetryCount() >= maxRetryCount) {
+                    event.setStatus(OutboxStatus.FAILED);
+                    log.error("Outbox event id={} permanently failed after {} retries: {}",
+                            event.getId(), event.getRetryCount(), ex.getMessage());
+                } else {
+                    log.warn("Outbox event id={} publish failed (attempt {}/{}), will retry next cycle: {}",
+                            event.getId(), event.getRetryCount(), maxRetryCount, ex.getMessage());
+                }
             }
         }
     }

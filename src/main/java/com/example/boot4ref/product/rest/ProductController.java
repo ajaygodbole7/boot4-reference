@@ -4,7 +4,6 @@ import com.example.boot4ref.product.ProductStatus;
 import com.example.boot4ref.product.service.ProductService;
 import java.math.BigDecimal;
 import java.net.URI;
-import java.time.Instant;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -34,11 +33,10 @@ public class ProductController implements ProductApi {
             @Nullable ProductStatus status,
             @Nullable BigDecimal minPrice,
             @Nullable BigDecimal maxPrice,
-            @Nullable Instant afterCreatedAt,
             @Nullable Long afterId,
             @Nullable Integer limit) {
         return ResponseEntity.ok(
-                productService.listFiltered(status, minPrice, maxPrice, afterCreatedAt, afterId, limit));
+                productService.listFiltered(status, minPrice, maxPrice, afterId, limit));
     }
 
     @Override

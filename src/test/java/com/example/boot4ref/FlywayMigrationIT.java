@@ -21,7 +21,7 @@ class FlywayMigrationIT extends AbstractIntegrationTest {
     @Test
     void shouldRunAllMigrationsSuccessfully() {
         var applied = flyway.info().applied();
-        assertThat(applied).hasSize(3);
+        assertThat(applied).hasSize(4);
     }
 
     // --- Products table ---
@@ -118,15 +118,18 @@ class FlywayMigrationIT extends AbstractIntegrationTest {
                 SELECT indexname FROM pg_indexes WHERE schemaname = 'public'
                 """, String.class);
 
+        // V4 drops idx_products_created_at_id and idx_orders_created_at_id (TSID ordering)
         assertThat(indexNames).contains(
                 "idx_products_status",
-                "idx_products_created_at_id",
                 "idx_orders_status",
-                "idx_orders_created_at_id",
                 "idx_order_lines_order_id",
                 "idx_order_lines_product_id",
                 "idx_outbox_pending",
                 "idx_outbox_aggregate"
+        );
+        assertThat(indexNames).doesNotContain(
+                "idx_products_created_at_id",
+                "idx_orders_created_at_id"
         );
     }
 

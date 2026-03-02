@@ -12,7 +12,6 @@ import com.example.boot4ref.product.rest.ProductResponse;
 import com.example.boot4ref.product.rest.ProductUpdateRequest;
 import com.example.boot4ref.product.specification.ProductSpecifications;
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
@@ -53,34 +52,32 @@ public class ProductService {
      * Returns filtered products using Specification composition and optional keyset cursor.
      *
      * <p>All parameters are optional; omitting them returns all products.
-     * Keyset cursor ({@code afterCreatedAt} + {@code afterId}) enables stable forward
-     * pagination without OFFSET.
+     * Keyset cursor ({@code afterId}) enables stable forward pagination without OFFSET.
+     * TSID IDs are time-ordered, so id alone gives chronological ordering.
      *
-     * @param status         filter by product status (exact match)
-     * @param minPrice       filter by minimum price (inclusive)
-     * @param maxPrice       filter by maximum price (inclusive)
-     * @param afterCreatedAt keyset cursor: the createdAt of the last seen product
-     * @param afterId        keyset cursor: the id of the last seen product
-     * @param limit          maximum number of results (default 20 if null)
+     * @param status   filter by product status (exact match)
+     * @param minPrice filter by minimum price (inclusive)
+     * @param maxPrice filter by maximum price (inclusive)
+     * @param afterId  keyset cursor: the id of the last seen product
+     * @param limit    maximum number of results (default 20 if null)
      */
     @Transactional(readOnly = true)
     public List<ProductResponse> listFiltered(
             @Nullable ProductStatus status,
             @Nullable BigDecimal minPrice,
             @Nullable BigDecimal maxPrice,
-            @Nullable Instant afterCreatedAt,
             @Nullable Long afterId,
             @Nullable Integer limit) {
 
         Specification<Product> spec = ProductSpecifications.byStatus(status)
                 .and(ProductSpecifications.minPrice(minPrice))
                 .and(ProductSpecifications.maxPrice(maxPrice))
-                .and(ProductSpecifications.keysetAfter(afterCreatedAt, afterId));
+                .and(ProductSpecifications.keysetAfter(afterId));
 
         int pageSize = (limit != null && limit > 0) ? limit : defaultPageSize;
 
         return productRepository.findAll(spec,
-                        PageRequest.of(0, pageSize, Sort.by("createdAt", "id")))
+                        PageRequest.of(0, pageSize, Sort.by(Sort.Direction.ASC, "id")))
                 .map(this::toResponse)
                 .getContent();
     }

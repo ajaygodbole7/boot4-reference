@@ -3,8 +3,8 @@ package com.example.boot4ref.order.rest;
 import com.example.boot4ref.order.OrderStatus;
 import com.example.boot4ref.order.service.OrderService;
 import java.net.URI;
-import java.time.Instant;
 import java.util.List;
+import org.hibernate.exception.ConstraintViolationException;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,10 +35,10 @@ public class OrderController implements OrderApi {
         try {
             created = orderService.create(request, idempotencyKey);
         } catch (DataIntegrityViolationException ex) {
-            // Race condition: concurrent request with same idempotency key won the INSERT.
-            // The TX is already rolled back — re-fetch the winner's order outside the TX.
-            if (idempotencyKey != null) {
-                log.debug("Idempotency key race detected, returning existing order for key={}", idempotencyKey);
+            // Only recover from idempotency key constraint violations.
+            // Other constraint violations (FK, null) should propagate as 500.
+            if (idempotencyKey != null && isIdempotencyKeyViolation(ex)) {
+                log.warn("Idempotency key race detected for key={}: {}", idempotencyKey, ex.getMessage());
                 created = orderService.findByIdempotencyKey(idempotencyKey);
             } else {
                 throw ex;
@@ -56,15 +56,22 @@ public class OrderController implements OrderApi {
     @Override
     public ResponseEntity<List<OrderResponse>> listOrders(
             @Nullable OrderStatus status,
-            @Nullable Instant afterCreatedAt,
             @Nullable Long afterId,
             @Nullable Integer limit) {
         return ResponseEntity.ok(
-                orderService.listFiltered(status, afterCreatedAt, afterId, limit));
+                orderService.listFiltered(status, afterId, limit));
     }
 
     @Override
     public ResponseEntity<OrderResponse> transitionStatus(Long id, OrderStatusRequest request) {
         return ResponseEntity.ok(orderService.transition(id, request.status()));
+    }
+
+    private static boolean isIdempotencyKeyViolation(DataIntegrityViolationException ex) {
+        if (ex.getCause() instanceof ConstraintViolationException cve) {
+            String constraintName = cve.getConstraintName();
+            return constraintName != null && constraintName.contains("idempotency_key");
+        }
+        return false;
     }
 }

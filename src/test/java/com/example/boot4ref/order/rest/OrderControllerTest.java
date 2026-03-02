@@ -9,7 +9,9 @@ import com.example.boot4ref.order.exception.OrderConflictException;
 import com.example.boot4ref.order.exception.OrderNotFoundException;
 import com.example.boot4ref.order.service.OrderService;
 import com.example.boot4ref.product.exception.ProductNotFoundException;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -213,7 +215,7 @@ class OrderControllerTest {
 
     @Test
     void shouldReturn200WithOrderListWhenListOrders() throws Exception {
-        when(orderService.listFiltered(null, null, null, null))
+        when(orderService.listFiltered(null, null, null))
                 .thenReturn(List.of(sampleOrderResponse(1L), sampleOrderResponse(2L)));
 
         mockMvc.perform(get("/api/orders"))
@@ -225,7 +227,7 @@ class OrderControllerTest {
 
     @Test
     void shouldReturn200WithEmptyListWhenNoOrders() throws Exception {
-        when(orderService.listFiltered(null, null, null, null))
+        when(orderService.listFiltered(null, null, null))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/api/orders"))
@@ -336,7 +338,7 @@ class OrderControllerTest {
 
     @Test
     void shouldReturn200WithFilteredOrdersWhenStatusProvided() throws Exception {
-        when(orderService.listFiltered(eq(OrderStatus.PLACED), isNull(), isNull(), eq(20)))
+        when(orderService.listFiltered(eq(OrderStatus.PLACED), isNull(), eq(20)))
                 .thenReturn(List.of(sampleOrderResponse(1L)));
 
         mockMvc.perform(get("/api/orders")
@@ -349,15 +351,47 @@ class OrderControllerTest {
 
     @Test
     void shouldReturn200WithKeysetPaginatedOrders() throws Exception {
-        Instant cursor = Instant.parse("2026-01-01T00:00:00Z");
-        when(orderService.listFiltered(isNull(), eq(cursor), eq(1L), eq(10)))
+        when(orderService.listFiltered(isNull(), eq(1L), eq(10)))
                 .thenReturn(List.of(sampleOrderResponse(2L)));
 
         mockMvc.perform(get("/api/orders")
-                        .param("afterCreatedAt", "2026-01-01T00:00:00Z")
                         .param("afterId", "1")
                         .param("limit", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    // =========== Idempotency constraint narrowing (P0-C) ===========
+
+    @Test
+    void shouldReturn201WhenIdempotencyKeyRaceWithCorrectConstraint() throws Exception {
+        var cause = new ConstraintViolationException("duplicate key", null, "orders_idempotency_key_key");
+        when(orderService.create(any(OrderCreateRequest.class), eq("dup-key")))
+                .thenThrow(new DataIntegrityViolationException("constraint", cause));
+        when(orderService.findByIdempotencyKey("dup-key")).thenReturn(sampleOrderResponse(42L));
+
+        mockMvc.perform(post("/api/orders")
+                        .header("Idempotency-Key", "dup-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"items":[{"productId":1,"quantity":2}]}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(42));
+    }
+
+    @Test
+    void shouldReturn500WhenNonIdempotencyConstraintViolation() throws Exception {
+        var cause = new ConstraintViolationException("fk violation", null, "order_lines_product_id_fkey");
+        when(orderService.create(any(OrderCreateRequest.class), eq("some-key")))
+                .thenThrow(new DataIntegrityViolationException("constraint", cause));
+
+        mockMvc.perform(post("/api/orders")
+                        .header("Idempotency-Key", "some-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"items":[{"productId":1,"quantity":2}]}
+                                """))
+                .andExpect(status().isInternalServerError());
     }
 }

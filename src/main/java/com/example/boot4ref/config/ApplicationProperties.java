@@ -49,12 +49,16 @@ public class ApplicationProperties {
 
     public static class Outbox {
         @NotNull
-        @Min(1) @Max(500)
-        private Integer batchSize = 50;
+        @Min(1) @Max(100)
+        private Integer batchSize = 10;
 
         @NotNull
         @Min(1)
         private Integer retentionDays = 7;
+
+        @NotNull
+        @Min(1) @Max(50)
+        private Integer maxRetryCount = 5;
 
         @NotNull
         @Min(1)
@@ -69,6 +73,9 @@ public class ApplicationProperties {
 
         public Integer getRetentionDays() { return retentionDays; }
         public void setRetentionDays(Integer retentionDays) { this.retentionDays = retentionDays; }
+
+        public Integer getMaxRetryCount() { return maxRetryCount; }
+        public void setMaxRetryCount(Integer maxRetryCount) { this.maxRetryCount = maxRetryCount; }
 
         public Long getPollIntervalMs() { return pollIntervalMs; }
         public void setPollIntervalMs(Long pollIntervalMs) { this.pollIntervalMs = pollIntervalMs; }

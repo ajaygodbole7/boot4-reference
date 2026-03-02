@@ -194,7 +194,7 @@ class ProductControllerTest {
 
     @Test
     void shouldReturn200WithProductListWhenListProducts() throws Exception {
-        when(productService.listFiltered(null, null, null, null, null, null))
+        when(productService.listFiltered(null, null, null, null, null))
                 .thenReturn(List.of(sampleResponse(1L), sampleResponse(2L)));
 
         mockMvc.perform(get("/api/products"))
@@ -206,7 +206,7 @@ class ProductControllerTest {
 
     @Test
     void shouldReturn200WithEmptyListWhenNoProducts() throws Exception {
-        when(productService.listFiltered(null, null, null, null, null, null))
+        when(productService.listFiltered(null, null, null, null, null))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/api/products"))
@@ -223,7 +223,6 @@ class ProductControllerTest {
                 eq(new BigDecimal("10.00")),
                 eq(new BigDecimal("50.00")),
                 eq(null),
-                eq(null),
                 eq(20)
         )).thenReturn(List.of(activeResponse(1L)));
 
@@ -239,18 +238,15 @@ class ProductControllerTest {
 
     @Test
     void shouldReturn200WithNextPageUsingKeysetCursor() throws Exception {
-        Instant cursor = Instant.parse("2026-01-01T00:00:00Z");
         when(productService.listFiltered(
                 eq(null),
                 eq(null),
                 eq(null),
-                eq(cursor),
                 eq(1L),
                 eq(10)
         )).thenReturn(List.of(sampleResponse(2L)));
 
         mockMvc.perform(get("/api/products")
-                        .param("afterCreatedAt", "2026-01-01T00:00:00Z")
                         .param("afterId", "1")
                         .param("limit", "10"))
                 .andExpect(status().isOk())
@@ -332,7 +328,8 @@ class ProductControllerTest {
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/409"))
-                .andExpect(jsonPath("$.title").value("Optimistic Lock Conflict"));
+                .andExpect(jsonPath("$.title").value("Optimistic Lock Conflict"))
+                .andExpect(jsonPath("$.detail").value("Resource was modified by another request"));
     }
 
     // =========== PATCH /api/products/{id} ===========
@@ -402,7 +399,8 @@ class ProductControllerTest {
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/409"))
-                .andExpect(jsonPath("$.title").value("Optimistic Lock Conflict"));
+                .andExpect(jsonPath("$.title").value("Optimistic Lock Conflict"))
+                .andExpect(jsonPath("$.detail").value("Resource was modified by another request"));
     }
 
     // =========== DELETE /api/products/{id} ===========

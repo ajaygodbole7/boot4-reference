@@ -8,7 +8,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -38,7 +37,6 @@ public interface ProductApi {
             @Parameter(description = "Filter by status") @RequestParam(required = false) @Nullable ProductStatus status,
             @Parameter(description = "Minimum price (inclusive)") @RequestParam(required = false) @Nullable BigDecimal minPrice,
             @Parameter(description = "Maximum price (inclusive)") @RequestParam(required = false) @Nullable BigDecimal maxPrice,
-            @Parameter(description = "Keyset cursor: createdAt of last seen product") @RequestParam(required = false) @Nullable Instant afterCreatedAt,
             @Parameter(description = "Keyset cursor: id of last seen product") @RequestParam(required = false) @Nullable Long afterId,
             @Parameter(description = "Maximum results to return (default 20)") @RequestParam(required = false) @Nullable Integer limit);
 

@@ -15,7 +15,14 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for {@link OutboxPoller}.
@@ -69,7 +76,7 @@ class OutboxPollerTest {
     }
 
     @Test
-    void shouldLeaveEventPendingAndAbortBatchOnPublishFailure() {
+    void shouldIncrementRetryCountAndContinueBatchOnPublishFailure() {
         OutboxEvent event1 = createPendingEvent();
         OutboxEvent event2 = createPendingEvent();
         when(outboxEventRepository.findPendingWithLock(anyInt())).thenReturn(List.of(event1, event2));
@@ -77,12 +84,51 @@ class OutboxPollerTest {
 
         outboxPoller.poll();
 
-        // First event stays PENDING — next poll cycle retries
+        // First event stays PENDING with incremented retryCount
         assertThat(event1.getStatus()).isEqualTo(OutboxStatus.PENDING);
+        assertThat(event1.getRetryCount()).isEqualTo(1);
         assertThat(event1.getProcessedAt()).isNull();
-        // Second event never attempted — batch aborted
+        // Second event still attempted — no batch abort
+        assertThat(event2.getStatus()).isEqualTo(OutboxStatus.PROCESSED);
+        verify(kafkaEventPublisher, times(2)).publish(any());
+    }
+
+    @Test
+    void shouldMarkEventAsFailedAfterMaxRetries() {
+        OutboxEvent event = createPendingEvent();
+        // Simulate 4 prior retries (default max = 5)
+        event.setRetryCount(4);
+        when(outboxEventRepository.findPendingWithLock(anyInt())).thenReturn(List.of(event));
+        doThrow(new RuntimeException("Kafka down")).when(kafkaEventPublisher).publish(event);
+
+        outboxPoller.poll();
+
+        assertThat(event.getStatus()).isEqualTo(OutboxStatus.FAILED);
+        assertThat(event.getRetryCount()).isEqualTo(5);
+    }
+
+    @Test
+    void shouldContinueProcessingAfterSingleEventFailure() {
+        OutboxEvent event1 = createPendingEvent();
+        OutboxEvent event2 = createPendingEvent();
+        OutboxEvent event3 = createPendingEvent();
+        when(outboxEventRepository.findPendingWithLock(anyInt())).thenReturn(List.of(event1, event2, event3));
+        // Use doAnswer with reference equality — OutboxEvent.equals returns false for null-ID entities
+        doAnswer(invocation -> {
+            OutboxEvent arg = invocation.getArgument(0);
+            if (arg == event2) {
+                throw new RuntimeException("Kafka blip");
+            }
+            return null;
+        }).when(kafkaEventPublisher).publish(any());
+
+        outboxPoller.poll();
+
+        assertThat(event1.getStatus()).isEqualTo(OutboxStatus.PROCESSED);
         assertThat(event2.getStatus()).isEqualTo(OutboxStatus.PENDING);
-        verify(kafkaEventPublisher, times(1)).publish(any());
+        assertThat(event2.getRetryCount()).isEqualTo(1);
+        assertThat(event3.getStatus()).isEqualTo(OutboxStatus.PROCESSED);
+        verify(kafkaEventPublisher, times(3)).publish(any());
     }
 
     @Test
