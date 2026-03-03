@@ -1,5 +1,6 @@
 package com.example.boot4ref.order.rest;
 
+import com.example.boot4ref.order.OrderConstraints;
 import com.example.boot4ref.order.OrderStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -37,7 +38,7 @@ public interface OrderApi {
     @PostMapping("/api/orders")
     @NonNull ResponseEntity<OrderResponse> createOrder(
             @Parameter(description = "Idempotency key for at-most-once creation")
-            @RequestHeader(value = "Idempotency-Key", required = false) @Nullable @Size(max = 255, message = "Idempotency key must not exceed 255 characters") String idempotencyKey,
+            @RequestHeader(value = "Idempotency-Key", required = false) @Size(max = OrderConstraints.MAX_IDEMPOTENCY_KEY_LENGTH) @Nullable String idempotencyKey,
             @Valid @RequestBody @NonNull OrderCreateRequest request);
 
     @Operation(summary = "Get order by ID with nested line items")

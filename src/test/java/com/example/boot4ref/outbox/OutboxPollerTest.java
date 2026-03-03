@@ -146,12 +146,14 @@ class OutboxPollerTest {
 
     @Test
     void shouldDelegateCleanupToRepository() {
-        when(outboxEventRepository.deleteByStatusBefore(any(OutboxStatus.class), any(Instant.class))).thenReturn(5);
+        when(outboxEventRepository.deleteByStatusProcessedBefore(any(OutboxStatus.class), any(Instant.class))).thenReturn(5);
+        when(outboxEventRepository.deleteByStatusCreatedBefore(any(OutboxStatus.class), any(Instant.class))).thenReturn(2);
 
         outboxPoller.cleanup();
 
         ArgumentCaptor<Instant> cutoffCaptor = ArgumentCaptor.forClass(Instant.class);
-        verify(outboxEventRepository).deleteByStatusBefore(eq(OutboxStatus.PROCESSED), cutoffCaptor.capture());
+        verify(outboxEventRepository).deleteByStatusProcessedBefore(eq(OutboxStatus.PROCESSED), cutoffCaptor.capture());
+        verify(outboxEventRepository).deleteByStatusCreatedBefore(eq(OutboxStatus.FAILED), any(Instant.class));
         // Cutoff should be roughly 7 days ago
         assertThat(cutoffCaptor.getValue()).isBefore(Instant.now().minusSeconds(6 * 24 * 3600));
     }

@@ -18,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -117,15 +118,15 @@ class OutboxIT extends AbstractIntegrationTest {
                 List.of(new OrderLineRequest(testProduct.getId(), 1)));
         orderService.create(request, "cleanup-test-key");
 
-        // Manually mark as processed with old timestamp
+        // Mark as processed 8 days ago
         OutboxEvent event = outboxEventRepository.findAll().getFirst();
         event.setStatus(OutboxStatus.PROCESSED);
         event.setProcessedAt(Instant.now().minus(8, ChronoUnit.DAYS));
         outboxEventRepository.saveAndFlush(event);
 
-        // Cleanup should delete entries older than 7 days
+        // Cleanup should delete PROCESSED entries with processedAt older than 7 days
         Instant cutoff = Instant.now().minus(7, ChronoUnit.DAYS);
-        int deleted = outboxEventRepository.deleteByStatusBefore(OutboxStatus.PROCESSED, cutoff);
+        int deleted = outboxEventRepository.deleteByStatusProcessedBefore(OutboxStatus.PROCESSED, cutoff);
         assertThat(deleted).isEqualTo(1);
 
         assertThat(outboxEventRepository.findAll()).isEmpty();
@@ -202,7 +203,7 @@ class OutboxIT extends AbstractIntegrationTest {
 
         // Cleanup with 7-day cutoff should NOT delete recent entries
         Instant cutoff = Instant.now().minus(7, ChronoUnit.DAYS);
-        int deleted = outboxEventRepository.deleteByStatusBefore(OutboxStatus.PROCESSED, cutoff);
+        int deleted = outboxEventRepository.deleteByStatusProcessedBefore(OutboxStatus.PROCESSED, cutoff);
         assertThat(deleted).isZero();
 
         assertThat(outboxEventRepository.findAll()).hasSize(1);

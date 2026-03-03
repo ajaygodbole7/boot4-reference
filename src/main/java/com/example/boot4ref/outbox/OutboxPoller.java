@@ -87,14 +87,14 @@ public class OutboxPoller {
      * Cleanup: deletes PROCESSED and FAILED entries older than {@code app.outbox.retention-days} (default 7).
      * Runs every {@code app.outbox.cleanup-interval-ms} (default 1 hour).
      *
-     * <p>{@code @Transactional} required: {@code @Modifying} deleteByStatusBefore needs
+     * <p>{@code @Transactional} required: {@code @Modifying} deleteByStatusProcessedBefore needs
      * an active transaction. {@code @Scheduled} methods do not inherit a transaction.
      */
     @Scheduled(fixedDelayString = "${app.outbox.cleanup-interval-ms}")
     @Transactional
     public void cleanup() {
         Instant cutoff = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
-        int deletedProcessed = outboxEventRepository.deleteByStatusBefore(OutboxStatus.PROCESSED, cutoff);
+        int deletedProcessed = outboxEventRepository.deleteByStatusProcessedBefore(OutboxStatus.PROCESSED, cutoff);
         int deletedFailed = outboxEventRepository.deleteByStatusCreatedBefore(OutboxStatus.FAILED, cutoff);
         int total = deletedProcessed + deletedFailed;
         if (total > 0) {

@@ -51,11 +51,6 @@ public class Product extends AbstractAuditingEntity {
     protected Product() {}
 
     /** Returns a new builder for constructing {@link Product} instances. */
-    @Override
-    public String toString() {
-        return "Product{id=" + getId() + "}";
-    }
-
     public static Builder builder() {
         return new Builder();
     }

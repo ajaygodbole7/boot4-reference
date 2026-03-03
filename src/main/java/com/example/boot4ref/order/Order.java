@@ -75,11 +75,6 @@ public class Order extends AbstractAuditingEntity {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    @Override
-    public String toString() {
-        return "Order{id=" + getId() + "}";
-    }
-
     public static Builder builder() {
         return new Builder();
     }

@@ -8,6 +8,7 @@ public final class OrderConstraints {
 
     public static final int MAX_QUANTITY = 10_000;
     public static final int MAX_LINE_ITEMS = 50;
+    public static final int MAX_IDEMPOTENCY_KEY_LENGTH = 255;
 
     private OrderConstraints() {}
 }
