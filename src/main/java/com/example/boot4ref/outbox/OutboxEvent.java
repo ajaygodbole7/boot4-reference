@@ -87,6 +87,11 @@ public class OutboxEvent {
         return getClass().hashCode();
     }
 
+    @Override
+    public String toString() {
+        return "OutboxEvent{id=" + id + "}";
+    }
+
     public static Builder builder() {
         return new Builder();
     }

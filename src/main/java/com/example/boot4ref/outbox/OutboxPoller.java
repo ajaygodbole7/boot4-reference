@@ -84,7 +84,7 @@ public class OutboxPoller {
     }
 
     /**
-     * Cleanup: deletes PROCESSED entries older than {@code app.outbox.retention-days} (default 7).
+     * Cleanup: deletes PROCESSED and FAILED entries older than {@code app.outbox.retention-days} (default 7).
      * Runs every {@code app.outbox.cleanup-interval-ms} (default 1 hour).
      *
      * <p>{@code @Transactional} required: {@code @Modifying} deleteByStatusBefore needs

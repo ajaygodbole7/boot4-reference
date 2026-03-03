@@ -168,7 +168,7 @@ class ExceptionTranslatorTest {
                         .param("id", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/400"))
-                .andExpect(jsonPath("$.title").value("Method Validation Error"))
+                .andExpect(jsonPath("$.title").value("Validation Error"))
                 .andExpect(jsonPath("$.validationErrors").isArray())
                 .andExpect(jsonPath("$.validationErrors[0].parameter").exists())
                 .andExpect(jsonPath("$.validationErrors[0].type").exists())

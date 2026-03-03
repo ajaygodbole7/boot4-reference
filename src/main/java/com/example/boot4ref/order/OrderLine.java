@@ -44,6 +44,11 @@ public class OrderLine extends AbstractAuditingEntity {
 
     protected OrderLine() {}
 
+    @Override
+    public String toString() {
+        return "OrderLine{id=" + getId() + "}";
+    }
+
     public static Builder builder() {
         return new Builder();
     }

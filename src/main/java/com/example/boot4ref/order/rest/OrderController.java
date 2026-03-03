@@ -42,9 +42,8 @@ public class OrderController implements OrderApi {
             if (idempotencyKey != null && isIdempotencyKeyViolation(ex)) {
                 log.warn("Idempotency key race detected for key={}: {}", idempotencyKey, ex.getMessage());
                 return ResponseEntity.ok(orderService.findByIdempotencyKey(idempotencyKey));
-            } else {
-                throw ex;
             }
+            throw ex;
         }
         if (result.newlyCreated()) {
             URI location = URI.create("/api/orders/" + result.order().id());

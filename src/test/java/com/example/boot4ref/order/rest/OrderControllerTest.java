@@ -401,6 +401,21 @@ class OrderControllerTest {
     // =========== Idempotency constraint narrowing (P0-C) ===========
 
     @Test
+    void shouldReturn200WhenIdempotencyKeyMatchesExistingOrder() throws Exception {
+        when(orderService.create(any(OrderCreateRequest.class), eq("existing-key")))
+                .thenReturn(new OrderCreateResult(sampleOrderResponse(42L), false));
+
+        mockMvc.perform(post("/api/orders")
+                        .header("Idempotency-Key", "existing-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"items":[{"productId":1,"quantity":2}]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(42));
+    }
+
+    @Test
     void shouldReturn200WhenIdempotencyKeyRaceWithCorrectConstraint() throws Exception {
         var cause = new ConstraintViolationException("duplicate key", null, "orders_idempotency_key_key");
         when(orderService.create(any(OrderCreateRequest.class), eq("dup-key")))

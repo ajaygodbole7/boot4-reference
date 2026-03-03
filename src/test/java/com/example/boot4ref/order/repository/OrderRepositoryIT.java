@@ -130,8 +130,8 @@ class OrderRepositoryIT extends AbstractIntegrationTest {
 
     @Test
     void shouldLoadPaginatedOrdersWithTwoQueryPatternWithoutNPlusOne() {
-        // Create 3 orders, each with a line item referencing a product
-        for (int i = 0; i < 3; i++) {
+        // Create 5 orders, each with a line item referencing a product
+        for (int i = 0; i < 5; i++) {
             orderRepository.save(createSimpleOrder());
         }
         orderRepository.flush();
@@ -142,10 +142,12 @@ class OrderRepositoryIT extends AbstractIntegrationTest {
         // bug caused by @EntityGraph + @OneToMany + Pageable.
         Specification<Order> spec = OrderSpecifications.byStatus(null);
         Page<Order> page = orderRepository.findAll(spec,
-                PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "id")));
+                PageRequest.of(0, 2, Sort.by(Sort.Direction.ASC, "id")));
+
+        assertThat(page.getContent()).hasSize(2);
+        assertThat(page.getTotalElements()).isGreaterThanOrEqualTo(5);
 
         List<Long> ids = page.getContent().stream().map(Order::getId).toList();
-        assertThat(ids).hasSizeGreaterThanOrEqualTo(3);
 
         List<Order> orders = orderRepository.findAllByIdIn(ids);
 

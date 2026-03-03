@@ -7,6 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
@@ -38,11 +39,12 @@ public class Order extends AbstractAuditingEntity {
     @Column(name = "total_amount", nullable = false, precision = 19, scale = 4)
     private BigDecimal totalAmount;
 
-    @Column(name = "idempotency_key", unique = true)
+    @Column(name = "idempotency_key", unique = true, length = 255)
     private String idempotencyKey;
 
     // Vlad Mihalcea: List not Set, CascadeType.ALL + orphanRemoval, bidirectional sync
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("id ASC")
     private List<OrderLine> orderLines = new ArrayList<>();
 
     protected Order() {}
@@ -71,6 +73,11 @@ public class Order extends AbstractAuditingEntity {
         this.totalAmount = orderLines.stream()
                 .map(line -> line.getUnitPrice().multiply(BigDecimal.valueOf(line.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    @Override
+    public String toString() {
+        return "Order{id=" + getId() + "}";
     }
 
     public static Builder builder() {

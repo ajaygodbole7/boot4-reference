@@ -176,7 +176,7 @@ public class ExceptionTranslator {
     public ResponseEntity<ProblemDetail> handleMethodValidation(
             HandlerMethodValidationException ex, HttpServletRequest request) {
         ProblemDetail problemDetail =
-                createBaseProblemDetail(HttpStatus.BAD_REQUEST, "Method Validation Error", ex, request);
+                createBaseProblemDetail(HttpStatus.BAD_REQUEST, "Validation Error", ex, request);
 
         List<Map<String, Object>> errors =
                 ex.getParameterValidationResults().stream()

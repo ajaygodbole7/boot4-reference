@@ -77,10 +77,13 @@ public class OutboxPublisher {
                     .withData("application/json", dataBytes)
                     .build();
 
-            return new String(
-                    io.cloudevents.core.provider.EventFormatProvider.getInstance()
-                            .resolveFormat("application/cloudevents+json")
-                            .serialize(cloudEvent));
+            var format = io.cloudevents.core.provider.EventFormatProvider.getInstance()
+                    .resolveFormat("application/cloudevents+json");
+            if (format == null) {
+                throw new IllegalStateException(
+                        "CloudEvents JSON format not registered — missing cloudevents-json-jackson dependency?");
+            }
+            return new String(format.serialize(cloudEvent));
         } catch (JacksonException e) {
             throw new IllegalStateException("Failed to serialize CloudEvent payload", e);
         }
