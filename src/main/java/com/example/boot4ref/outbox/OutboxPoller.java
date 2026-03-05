@@ -87,7 +87,7 @@ public class OutboxPoller {
      * Cleanup: deletes PROCESSED and FAILED entries older than {@code app.outbox.retention-days} (default 7).
      * Runs every {@code app.outbox.cleanup-interval-ms} (default 1 hour).
      *
-     * <p>{@code @Transactional} required: {@code @Modifying} deleteByStatusProcessedBefore needs
+     * <p>{@code @Transactional} required: the {@code @Modifying} delete queries need
      * an active transaction. {@code @Scheduled} methods do not inherit a transaction.
      */
     @Scheduled(fixedDelayString = "${app.outbox.cleanup-interval-ms}")
