@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -35,7 +36,7 @@ public interface OrderApi {
     @PostMapping("/api/orders")
     @NonNull ResponseEntity<OrderResponse> createOrder(
             @Parameter(description = "Idempotency key for at-most-once creation")
-            @RequestHeader(value = "Idempotency-Key", required = false) @Nullable String idempotencyKey,
+            @RequestHeader(value = "Idempotency-Key", required = false) @Nullable @Size(max = 255, message = "Idempotency key must not exceed 255 characters") String idempotencyKey,
             @Valid @RequestBody @NonNull OrderCreateRequest request);
 
     @Operation(summary = "Get order by ID with nested line items")

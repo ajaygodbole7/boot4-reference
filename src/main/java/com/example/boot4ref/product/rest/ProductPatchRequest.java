@@ -14,6 +14,10 @@ import org.jspecify.annotations.Nullable;
  * <p>All fields are optional ({@code @Nullable}). Only non-null fields are applied;
  * null fields leave the existing product value unchanged.
  *
+ * <p>To explicitly clear the description to null, set {@code "clearDescription": true}.
+ * This is necessary because JSON null is ambiguous (absent vs explicit null) in the
+ * null-as-absent pattern used by the other fields.
+ *
  * <p>Validation annotations apply only when the field is present (non-null).
  */
 public record ProductPatchRequest(
@@ -36,5 +40,8 @@ public record ProductPatchRequest(
 
         @Nullable
         @PositiveOrZero(message = "Stock cannot be negative")
-        Integer stock
+        Integer stock,
+
+        @Nullable
+        Boolean clearDescription
 ) {}

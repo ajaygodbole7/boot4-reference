@@ -78,13 +78,13 @@ public class OrderService {
      * </ul>
      */
     @Transactional
-    public OrderResponse create(OrderCreateRequest request, @Nullable String idempotencyKey) {
+    public OrderCreateResult create(OrderCreateRequest request, @Nullable String idempotencyKey) {
         // Idempotency check — return existing order if key matches
         if (idempotencyKey != null) {
             var existing = orderRepository.findByIdempotencyKey(idempotencyKey);
             if (existing.isPresent()) {
                 log.debug("Returning existing order for idempotency key={}", idempotencyKey);
-                return toResponse(existing.get());
+                return new OrderCreateResult(toResponse(existing.get()), false);
             }
         }
 
@@ -145,7 +145,7 @@ public class OrderService {
 
         log.info("Created order id={} with {} lines, total={}",
                 saved.getId(), saved.getOrderLines().size(), saved.getTotalAmount());
-        return toResponse(saved);
+        return new OrderCreateResult(toResponse(saved), true);
     }
 
     /**
@@ -188,10 +188,21 @@ public class OrderService {
 
         int pageSize = (limit != null && limit > 0) ? Math.min(limit, maxPageSize) : defaultPageSize;
 
-        return orderRepository.findAll(spec,
+        // Two-query pattern: first get IDs with correct LIMIT (no row inflation),
+        // then batch-fetch full entity graph for those IDs.
+        List<Long> ids = orderRepository.findAll(spec,
                         PageRequest.of(0, pageSize, Sort.by(Sort.Direction.ASC, "id")))
-                .map(this::toResponse)
+                .map(Order::getId)
                 .getContent();
+
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+
+        return orderRepository.findAllByIdIn(ids).stream()
+                .sorted(Comparator.comparing(Order::getId))
+                .map(this::toResponse)
+                .toList();
     }
 
     /**

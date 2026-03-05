@@ -130,6 +130,7 @@ public class ProductService {
     @Transactional
     public ProductResponse update(Long id, ProductUpdateRequest request) {
         Product product = findOrThrow(id);
+        rejectIfDiscontinued(product);
         product.setName(request.name());
         product.setDescription(request.description());
         product.setPrice(request.price());
@@ -154,10 +155,13 @@ public class ProductService {
     @Transactional
     public ProductResponse patch(Long id, ProductPatchRequest request) {
         Product product = findOrThrow(id);
+        rejectIfDiscontinued(product);
         if (request.name() != null) {
             product.setName(request.name());
         }
-        if (request.description() != null) {
+        if (Boolean.TRUE.equals(request.clearDescription())) {
+            product.setDescription(null);
+        } else if (request.description() != null) {
             product.setDescription(request.description());
         }
         if (request.price() != null) {
@@ -210,6 +214,13 @@ public class ProductService {
     }
 
     // -------------------------------------------------------------------------
+
+    private void rejectIfDiscontinued(Product product) {
+        if (product.getStatus() == ProductStatus.DISCONTINUED) {
+            throw new ProductConflictException(
+                    "Cannot modify product " + product.getId() + " in DISCONTINUED status");
+        }
+    }
 
     private Product findOrThrow(Long id) {
         return productRepository.findById(id)

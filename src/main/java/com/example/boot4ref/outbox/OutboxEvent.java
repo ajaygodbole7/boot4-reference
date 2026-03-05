@@ -1,6 +1,6 @@
 package com.example.boot4ref.outbox;
 
-import io.hypersistence.tsid.TSID;
+import com.example.boot4ref.common.TsidFactory;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -25,8 +25,6 @@ import java.time.Instant;
 @Getter
 @Setter
 public class OutboxEvent {
-
-    private static final TSID.Factory TSID_FACTORY = TSID.Factory.builder().build();
 
     @Id
     @Column(name = "id", nullable = false, updatable = false)
@@ -67,7 +65,7 @@ public class OutboxEvent {
     @PrePersist
     void prePersist() {
         if (this.id == null) {
-            this.id = TSID_FACTORY.generate().toLong();
+            this.id = TsidFactory.nextId();
         }
         if (this.createdAt == null) {
             this.createdAt = Instant.now();

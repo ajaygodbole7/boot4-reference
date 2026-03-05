@@ -1,5 +1,6 @@
 package com.example.boot4ref.order.rest;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
@@ -12,5 +13,6 @@ public record OrderLineRequest(
 
         @NotNull(message = "Quantity is required")
         @Positive(message = "Quantity must be positive")
+        @Max(value = 10_000, message = "Quantity must not exceed 10,000")
         Integer quantity
 ) {}

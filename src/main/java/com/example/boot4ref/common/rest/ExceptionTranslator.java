@@ -261,7 +261,9 @@ public class ExceptionTranslator {
     private ResponseEntity<ProblemDetail> buildErrorResponse(
             HttpStatus status, String title, Exception ex, HttpServletRequest request) {
         ProblemDetail problemDetail = createBaseProblemDetail(status, title, ex, request);
-        if (status.is4xxClientError()) {
+        if (status == HttpStatus.NOT_FOUND) {
+            log.info("{} {} -> {} {}", request.getMethod(), request.getRequestURI(), status.value(), title);
+        } else if (status.is4xxClientError()) {
             log.warn("{} {} -> {} {}", request.getMethod(), request.getRequestURI(), status.value(), title);
         } else if (status.is5xxServerError()) {
             log.error("{} {} -> {} {}", request.getMethod(), request.getRequestURI(), status.value(), title);

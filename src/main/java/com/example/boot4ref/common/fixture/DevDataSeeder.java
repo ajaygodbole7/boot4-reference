@@ -72,10 +72,10 @@ public class DevDataSeeder implements ApplicationRunner {
 
         for (int i = 0; i < ORDER_SEED_COUNT; i++) {
             Product target = products.get(i % products.size());
-            var response = orderService.create(
+            var result = orderService.create(
                     new OrderCreateRequest(List.of(new OrderLineRequest(target.getId(), i + 1))),
                     "dev-seed-" + i);
-            log.debug("Seeded order id={}", response.id());
+            log.debug("Seeded order id={}", result.order().id());
         }
 
         log.info("Dev data seeding complete");

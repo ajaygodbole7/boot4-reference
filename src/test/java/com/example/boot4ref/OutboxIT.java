@@ -7,6 +7,7 @@ import com.example.boot4ref.order.event.EventTypes;
 import com.example.boot4ref.order.rest.OrderCreateRequest;
 import com.example.boot4ref.order.rest.OrderLineRequest;
 import com.example.boot4ref.order.rest.OrderResponse;
+import com.example.boot4ref.order.service.OrderCreateResult;
 import com.example.boot4ref.order.service.OrderService;
 import com.example.boot4ref.outbox.OutboxEvent;
 import com.example.boot4ref.outbox.OutboxEventRepository;
@@ -53,14 +54,14 @@ class OutboxIT extends AbstractIntegrationTest {
     void shouldInsertOutboxEntryWhenOrderCreated() {
         OrderCreateRequest request = OrderFixtures.randomOrderCreateRequest(testProduct.getId());
 
-        OrderResponse created = orderService.create(request, "outbox-create-key");
+        OrderCreateResult result = orderService.create(request, "outbox-create-key");
 
         List<OutboxEvent> events = outboxEventRepository.findAll();
         assertThat(events).hasSize(1);
 
         OutboxEvent event = events.getFirst();
         assertThat(event.getAggregateType()).isEqualTo("Order");
-        assertThat(event.getAggregateId()).isEqualTo(created.id());
+        assertThat(event.getAggregateId()).isEqualTo(result.order().id());
         assertThat(event.getEventType()).isEqualTo(EventTypes.ORDER_PLACED);
         assertThat(event.getStatus()).isEqualTo(OutboxStatus.PENDING);
         assertThat(event.getRetryCount()).isZero();
@@ -70,9 +71,9 @@ class OutboxIT extends AbstractIntegrationTest {
     void shouldInsertOutboxEntryWhenOrderTransitioned() {
         OrderCreateRequest request = new OrderCreateRequest(
                 List.of(new OrderLineRequest(testProduct.getId(), 1)));
-        OrderResponse created = orderService.create(request, "outbox-transition-key");
+        OrderCreateResult result = orderService.create(request, "outbox-transition-key");
 
-        orderService.transition(created.id(), OrderStatus.CONFIRMED);
+        orderService.transition(result.order().id(), OrderStatus.CONFIRMED);
 
         List<OutboxEvent> events = outboxEventRepository.findAll();
         assertThat(events).hasSize(2);
@@ -134,11 +135,11 @@ class OutboxIT extends AbstractIntegrationTest {
     void shouldProduceEventsForFullOrderLifecycle() {
         OrderCreateRequest request = new OrderCreateRequest(
                 List.of(new OrderLineRequest(testProduct.getId(), 1)));
-        OrderResponse created = orderService.create(request, "lifecycle-key");
+        OrderCreateResult result = orderService.create(request, "lifecycle-key");
 
-        orderService.transition(created.id(), OrderStatus.CONFIRMED);
-        orderService.transition(created.id(), OrderStatus.SHIPPED);
-        orderService.transition(created.id(), OrderStatus.DELIVERED);
+        orderService.transition(result.order().id(), OrderStatus.CONFIRMED);
+        orderService.transition(result.order().id(), OrderStatus.SHIPPED);
+        orderService.transition(result.order().id(), OrderStatus.DELIVERED);
 
         List<String> eventTypes = outboxEventRepository.findAll().stream()
                 .map(OutboxEvent::getEventType).toList();
@@ -151,9 +152,9 @@ class OutboxIT extends AbstractIntegrationTest {
     void shouldProduceCancelledEventOnCancellation() {
         OrderCreateRequest request = new OrderCreateRequest(
                 List.of(new OrderLineRequest(testProduct.getId(), 1)));
-        OrderResponse created = orderService.create(request, "cancel-event-key");
+        OrderCreateResult result = orderService.create(request, "cancel-event-key");
 
-        orderService.transition(created.id(), OrderStatus.CANCELLED);
+        orderService.transition(result.order().id(), OrderStatus.CANCELLED);
 
         List<String> eventTypes = outboxEventRepository.findAll().stream()
                 .map(OutboxEvent::getEventType).toList();

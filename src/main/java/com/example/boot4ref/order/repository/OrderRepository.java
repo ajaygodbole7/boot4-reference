@@ -41,9 +41,18 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
     List<Order> findAll(Specification<Order> spec);
 
     /**
-     * Paginated filtered queries with @EntityGraph — N+1 prevention tier 2.
-     * Overrides JpaSpecificationExecutor default which lacks eager fetching.
+     * Paginated filtered queries — overrides JpaSpecificationExecutor default.
+     * No @EntityGraph here: JOIN FETCH with @OneToMany inflates rows and breaks
+     * LIMIT/OFFSET pagination. Use {@link #findAllByIdIn(List)} to batch-fetch
+     * the full entity graph for the IDs returned by this query.
      */
-    @EntityGraph(attributePaths = {"orderLines", "orderLines.product"})
     Page<Order> findAll(Specification<Order> spec, Pageable pageable);
+
+    /**
+     * Batch-fetches orders with their line items and products by ID list.
+     * Second query in the two-query pagination pattern: first query gets IDs
+     * with correct LIMIT, then this query loads the full entity graph.
+     */
+    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderLines ol LEFT JOIN FETCH ol.product WHERE o.id IN :ids")
+    List<Order> findAllByIdIn(List<Long> ids);
 }

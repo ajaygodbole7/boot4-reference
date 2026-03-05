@@ -43,7 +43,7 @@ http() {
 }
 
 json_field() {
-  python3.11 -c "import sys,json; print(json.load(open('/tmp/http_resp')).get('$1',''))" 2>/dev/null || echo ""
+  python3 -c "import sys,json; print(json.load(open('/tmp/http_resp')).get('$1',''))" 2>/dev/null || echo ""
 }
 
 TOTAL_OK=0; TOTAL_ERR=0

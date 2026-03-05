@@ -1,6 +1,7 @@
 package com.example.boot4ref.order.rest;
 
 import com.example.boot4ref.order.OrderStatus;
+import com.example.boot4ref.order.service.OrderCreateResult;
 import com.example.boot4ref.order.service.OrderService;
 import java.net.URI;
 import java.util.List;
@@ -32,21 +33,24 @@ public class OrderController implements OrderApi {
 
     @Override
     public ResponseEntity<OrderResponse> createOrder(@Nullable String idempotencyKey, OrderCreateRequest request) {
-        OrderResponse created;
+        OrderCreateResult result;
         try {
-            created = orderService.create(request, idempotencyKey);
+            result = orderService.create(request, idempotencyKey);
         } catch (DataIntegrityViolationException ex) {
             // Only recover from idempotency key constraint violations.
             // Other constraint violations (FK, null) propagate to ExceptionTranslator (409).
             if (idempotencyKey != null && isIdempotencyKeyViolation(ex)) {
                 log.warn("Idempotency key race detected for key={}: {}", idempotencyKey, ex.getMessage());
-                created = orderService.findByIdempotencyKey(idempotencyKey);
+                return ResponseEntity.ok(orderService.findByIdempotencyKey(idempotencyKey));
             } else {
                 throw ex;
             }
         }
-        URI location = URI.create("/api/orders/" + created.id());
-        return ResponseEntity.created(location).body(created);
+        if (result.newlyCreated()) {
+            URI location = URI.create("/api/orders/" + result.order().id());
+            return ResponseEntity.created(location).body(result.order());
+        }
+        return ResponseEntity.ok(result.order());
     }
 
     @Override

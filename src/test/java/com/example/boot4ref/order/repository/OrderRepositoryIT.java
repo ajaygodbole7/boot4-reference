@@ -129,7 +129,7 @@ class OrderRepositoryIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldLoadPaginatedOrdersWithoutNPlusOneQueries() {
+    void shouldLoadPaginatedOrdersWithTwoQueryPatternWithoutNPlusOne() {
         // Create 3 orders, each with a line item referencing a product
         for (int i = 0; i < 3; i++) {
             orderRepository.save(createSimpleOrder());
@@ -137,25 +137,30 @@ class OrderRepositoryIT extends AbstractIntegrationTest {
         orderRepository.flush();
         QueryCountHolder.clear();
 
-        // Paginated findAll(spec, pageable) — the path fixed by P0-A @EntityGraph
+        // Two-query pattern: first get IDs with correct pagination,
+        // then batch-fetch full entity graph. This avoids the row inflation
+        // bug caused by @EntityGraph + @OneToMany + Pageable.
         Specification<Order> spec = OrderSpecifications.byStatus(null);
         Page<Order> page = orderRepository.findAll(spec,
                 PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "id")));
 
-        assertThat(page.getContent()).hasSizeGreaterThanOrEqualTo(3);
-        // Access lazy associations to prove they were eagerly loaded
-        page.getContent().forEach(order -> {
+        List<Long> ids = page.getContent().stream().map(Order::getId).toList();
+        assertThat(ids).hasSizeGreaterThanOrEqualTo(3);
+
+        List<Order> orders = orderRepository.findAllByIdIn(ids);
+
+        // Access lazy associations to prove they were eagerly loaded by findAllByIdIn
+        orders.forEach(order -> {
             assertThat(order.getOrderLines()).isNotEmpty();
             order.getOrderLines().forEach(line ->
                     assertThat(line.getProduct().getName()).isNotNull());
         });
 
-        // Without @EntityGraph: 1 SELECT for orders + N SELECTs for orderLines + N for products
-        // With @EntityGraph: 1 SELECT with LEFT JOIN (plus 1 count query for Page)
+        // Two-query pattern: 1 SELECT for IDs + 1 count + 1 SELECT for full graph = 3 queries
         long selectCount = QueryCountHolder.getGrandTotal().getSelect();
         assertThat(selectCount)
-                .as("Paginated findAll should use @EntityGraph (expected 2: data + count), got %d", selectCount)
-                .isLessThanOrEqualTo(2);
+                .as("Two-query pattern should execute 3 SELECTs (IDs + count + graph), got %d", selectCount)
+                .isLessThanOrEqualTo(3);
     }
 
     @Test

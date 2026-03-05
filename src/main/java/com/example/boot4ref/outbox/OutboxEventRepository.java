@@ -26,10 +26,19 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
     List<OutboxEvent> findPendingWithLock(int limit);
 
     /**
-     * Deletes entries with the given status older than the given timestamp.
+     * Deletes PROCESSED entries older than the given timestamp (by processedAt).
      */
     @Modifying
     @Transactional
     @Query("DELETE FROM OutboxEvent e WHERE e.status = :status AND e.processedAt < :before")
     int deleteByStatusBefore(OutboxStatus status, Instant before);
+
+    /**
+     * Deletes FAILED entries older than the given timestamp (by createdAt).
+     * FAILED events have null processedAt, so we use createdAt instead.
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM OutboxEvent e WHERE e.status = :status AND e.createdAt < :before")
+    int deleteByStatusCreatedBefore(OutboxStatus status, Instant before);
 }

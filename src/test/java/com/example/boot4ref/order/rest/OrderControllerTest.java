@@ -9,6 +9,7 @@ import com.example.boot4ref.order.exception.DuplicateLineItemException;
 import com.example.boot4ref.order.exception.InsufficientStockException;
 import com.example.boot4ref.order.exception.OrderConflictException;
 import com.example.boot4ref.order.exception.OrderNotFoundException;
+import com.example.boot4ref.order.service.OrderCreateResult;
 import com.example.boot4ref.order.service.OrderService;
 import com.example.boot4ref.product.exception.ProductNotFoundException;
 import org.hibernate.exception.ConstraintViolationException;
@@ -78,7 +79,7 @@ class OrderControllerTest {
     @Test
     void shouldReturn201WithLocationHeaderWhenCreatingValidOrder() throws Exception {
         when(orderService.create(any(OrderCreateRequest.class), eq("key-123")))
-                .thenReturn(sampleOrderResponse(42L));
+                .thenReturn(new OrderCreateResult(sampleOrderResponse(42L), true));
 
         mockMvc.perform(post("/api/orders")
                         .header("Idempotency-Key", "key-123")
@@ -98,7 +99,7 @@ class OrderControllerTest {
     @Test
     void shouldReturn201WhenCreatingOrderWithoutIdempotencyKey() throws Exception {
         when(orderService.create(any(OrderCreateRequest.class), isNull()))
-                .thenReturn(sampleOrderResponse(43L));
+                .thenReturn(new OrderCreateResult(sampleOrderResponse(43L), true));
 
         mockMvc.perform(post("/api/orders")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -400,7 +401,7 @@ class OrderControllerTest {
     // =========== Idempotency constraint narrowing (P0-C) ===========
 
     @Test
-    void shouldReturn201WhenIdempotencyKeyRaceWithCorrectConstraint() throws Exception {
+    void shouldReturn200WhenIdempotencyKeyRaceWithCorrectConstraint() throws Exception {
         var cause = new ConstraintViolationException("duplicate key", null, "orders_idempotency_key_key");
         when(orderService.create(any(OrderCreateRequest.class), eq("dup-key")))
                 .thenThrow(new DataIntegrityViolationException("constraint", cause));
@@ -412,7 +413,7 @@ class OrderControllerTest {
                         .content("""
                                 {"items":[{"productId":1,"quantity":2}]}
                                 """))
-                .andExpect(status().isCreated())
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(42));
     }
 

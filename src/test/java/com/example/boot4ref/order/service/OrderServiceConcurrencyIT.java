@@ -155,7 +155,7 @@ class OrderServiceConcurrencyIT extends AbstractIntegrationTest {
         // Create an order to transition
         OrderCreateRequest request = new OrderCreateRequest(
                 List.of(new OrderLineRequest(testProduct.getId(), 1)));
-        var created = orderService.create(request, "opt-lock-test");
+        var created = orderService.create(request, "opt-lock-test").order();
 
         int threadCount = 2;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);

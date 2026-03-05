@@ -94,9 +94,12 @@ public class OutboxPoller {
     @Transactional
     public void cleanup() {
         Instant cutoff = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
-        int deleted = outboxEventRepository.deleteByStatusBefore(OutboxStatus.PROCESSED, cutoff);
-        if (deleted > 0) {
-            log.info("Cleaned up {} processed outbox events older than {} days", deleted, retentionDays);
+        int deletedProcessed = outboxEventRepository.deleteByStatusBefore(OutboxStatus.PROCESSED, cutoff);
+        int deletedFailed = outboxEventRepository.deleteByStatusCreatedBefore(OutboxStatus.FAILED, cutoff);
+        int total = deletedProcessed + deletedFailed;
+        if (total > 0) {
+            log.info("Cleaned up {} outbox events older than {} days ({} processed, {} failed)",
+                    total, retentionDays, deletedProcessed, deletedFailed);
         }
     }
 }

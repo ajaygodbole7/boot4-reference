@@ -117,6 +117,7 @@ class ProductServiceRetryIT extends AbstractIntegrationTest {
                 "Patch Will Not Succeed",
                 null,
                 null,
+                null,
                 null
         );
 
