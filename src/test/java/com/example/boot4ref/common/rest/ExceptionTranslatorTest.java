@@ -16,6 +16,8 @@ import jakarta.validation.constraints.Positive;
 import com.example.boot4ref.config.ApplicationProperties;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.dao.TransientDataAccessResourceException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -219,7 +221,30 @@ class ExceptionTranslatorTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/400"))
                 .andExpect(jsonPath("$.title").value("Malformed JSON"))
-                .andExpect(jsonPath("$.detail").exists());
+                .andExpect(jsonPath("$.detail").value("Malformed JSON request body"));
+    }
+
+    @Test
+    void shouldReturn503WhenTransientDataAccessFailure() throws Exception {
+        mockMvc.perform(get("/test/transient-failure"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/503"))
+                .andExpect(jsonPath("$.title").value("Service Temporarily Unavailable"))
+                .andExpect(jsonPath("$.detail").value("Database temporarily unavailable, please retry"))
+                .andExpect(jsonPath("$.errorCode").value("SERVICE_TEMPORARILY_UNAVAILABLE"))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.request").exists());
+    }
+
+    @Test
+    void shouldReturn409Not503WhenConcurrencyFailure() throws Exception {
+        // ConcurrencyFailureException extends TransientDataAccessException.
+        // Verify ExceptionDepthComparator routes to 409, not 503.
+        mockMvc.perform(get("/test/optimistic-lock-failure"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Concurrency Conflict"))
+                .andExpect(jsonPath("$.detail").value("Concurrent modification conflict, please retry"))
+                .andExpect(jsonPath("$.status").value(409));
     }
 
     @Test
@@ -302,6 +327,16 @@ class ExceptionTranslatorTest {
         @GetMapping(value = "/test/json-response", produces = MediaType.APPLICATION_JSON_VALUE)
         public Map<String, String> jsonResponse() {
             return Map.of("status", "ok");
+        }
+
+        @GetMapping("/test/transient-failure")
+        public void transientFailure() {
+            throw new TransientDataAccessResourceException("Connection refused");
+        }
+
+        @GetMapping("/test/optimistic-lock-failure")
+        public void optimisticLockFailure() {
+            throw new ObjectOptimisticLockingFailureException("Product", 42L);
         }
 
         @GetMapping("/test/error")

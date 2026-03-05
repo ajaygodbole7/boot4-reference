@@ -9,7 +9,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import org.springframework.http.MediaType;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -35,5 +38,15 @@ class ExceptionTranslatorDevProfileTest {
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/500"))
                 .andExpect(jsonPath("$.title").value("Internal Server Error"))
                 .andExpect(jsonPath("$.detail").value("An unexpected internal error occurred"));
+    }
+
+    @Test
+    void shouldIncludeParseErrorInDevProfileForMalformedJson() throws Exception {
+        mockMvc.perform(post("/test/validate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{bad json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("Malformed JSON request body"))
+                .andExpect(jsonPath("$.parseError").exists());
     }
 }

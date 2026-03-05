@@ -28,9 +28,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.PessimisticLockingFailureException;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.dao.TransientDataAccessException;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -87,29 +87,27 @@ public class ExceptionTranslator {
         return buildErrorResponse(HttpStatus.SERVICE_UNAVAILABLE, "Service Unavailable", ex, request);
     }
 
-    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
-    public ResponseEntity<ProblemDetail> handleOptimisticLock(
-            ObjectOptimisticLockingFailureException ex, HttpServletRequest request) {
-        var response = buildErrorResponse(HttpStatus.CONFLICT, "Optimistic Lock Conflict", ex, request);
-        Objects.requireNonNull(response.getBody()).setDetail("Resource was modified by another request");
-        return response;
+    @ExceptionHandler(ConcurrencyFailureException.class)
+    public ResponseEntity<ProblemDetail> handleConcurrencyFailure(
+            ConcurrencyFailureException ex, HttpServletRequest request) {
+        return buildScrubbedErrorResponse(HttpStatus.CONFLICT, "Concurrency Conflict",
+                "Concurrent modification conflict, please retry", ex, request);
+    }
+
+    @ExceptionHandler(TransientDataAccessException.class)
+    public ResponseEntity<ProblemDetail> handleTransientDataAccess(
+            TransientDataAccessException ex, HttpServletRequest request) {
+        return buildScrubbedErrorResponse(HttpStatus.SERVICE_UNAVAILABLE,
+                "Service Temporarily Unavailable",
+                "Database temporarily unavailable, please retry", ex, request);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ProblemDetail> handleDataIntegrityViolation(
             DataIntegrityViolationException ex, HttpServletRequest request) {
-        var response = buildErrorResponse(HttpStatus.CONFLICT, "Data Integrity Violation", ex, request);
-        Objects.requireNonNull(response.getBody())
-                .setDetail("Operation violates a data integrity constraint (e.g. referenced by other records)");
-        return response;
-    }
-
-    @ExceptionHandler(PessimisticLockingFailureException.class)
-    public ResponseEntity<ProblemDetail> handlePessimisticLock(
-            PessimisticLockingFailureException ex, HttpServletRequest request) {
-        var response = buildErrorResponse(HttpStatus.CONFLICT, "Resource Busy", ex, request);
-        Objects.requireNonNull(response.getBody()).setDetail("Resource is temporarily locked, please retry");
-        return response;
+        return buildScrubbedErrorResponse(HttpStatus.CONFLICT, "Data Integrity Violation",
+                "Operation violates a data integrity constraint (e.g. referenced by other records)",
+                ex, request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -132,6 +130,7 @@ public class ExceptionTranslator {
                                 "errorCode", Optional.ofNullable(error.getCode()).orElse("UNKNOWN_CODE"),
                                 "bindingFailure", String.valueOf(error.isBindingFailure())))
                         .toList());
+        log.warn("{} {} -> 400 Validation Error", request.getMethod(), request.getRequestURI());
         return ResponseEntity.badRequest().body(problemDetail);
     }
 
@@ -140,11 +139,14 @@ public class ExceptionTranslator {
             HttpMessageNotReadableException ex, HttpServletRequest request) {
         ProblemDetail problemDetail =
                 createBaseProblemDetail(HttpStatus.BAD_REQUEST, "Malformed JSON", ex, request);
-        String errorDetail =
-                Optional.ofNullable(ex.getMostSpecificCause())
-                        .map(cause -> "JSON parsing error: " + cause.getMessage())
-                        .orElse("Malformed JSON input: " + ex.getMessage());
-        problemDetail.setDetail(errorDetail);
+        problemDetail.setDetail("Malformed JSON request body");
+        if (isDevProfile) {
+            String rawDetail = Optional.ofNullable(ex.getMostSpecificCause())
+                    .map(cause -> "JSON parsing error: " + cause.getMessage())
+                    .orElse("Malformed JSON input: " + ex.getMessage());
+            problemDetail.setProperty("parseError", rawDetail);
+        }
+        log.warn("{} {} -> 400 Malformed JSON", request.getMethod(), request.getRequestURI());
         return ResponseEntity.badRequest().body(problemDetail);
     }
 
@@ -222,15 +224,7 @@ public class ExceptionTranslator {
                         .toList();
 
         problemDetail.setProperty("validationErrors", errors);
-
-        if (!ex.getCrossParameterValidationResults().isEmpty()) {
-            List<String> crossErrors =
-                    ex.getCrossParameterValidationResults().stream()
-                            .map(MessageSourceResolvable::getDefaultMessage)
-                            .toList();
-            problemDetail.setProperty("crossParameterErrors", crossErrors);
-        }
-
+        log.warn("{} {} -> 400 Method Validation Error", request.getMethod(), request.getRequestURI());
         return ResponseEntity.status(ex.getStatusCode()).body(problemDetail);
     }
 
@@ -244,6 +238,7 @@ public class ExceptionTranslator {
                 "expectedType",
                 ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "Unknown");
         problemDetail.setProperty("invalidValue", ex.getValue());
+        log.warn("{} {} -> 400 Invalid Path Variable", request.getMethod(), request.getRequestURI());
         return ResponseEntity.badRequest().body(problemDetail);
     }
 
@@ -251,11 +246,8 @@ public class ExceptionTranslator {
     public ResponseEntity<ProblemDetail> handleUnexpectedException(
             Exception ex, HttpServletRequest request) {
         log.error("Unexpected error occurred", ex);
-        ProblemDetail problemDetail = createBaseProblemDetail(
-                HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", ex, request);
-        // Never leak raw exception messages to clients
-        problemDetail.setDetail("An unexpected internal error occurred");
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(problemDetail);
+        return buildScrubbedErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR,
+                "Internal Server Error", "An unexpected internal error occurred", ex, request);
     }
 
     private ResponseEntity<ProblemDetail> buildErrorResponse(
@@ -269,6 +261,14 @@ public class ExceptionTranslator {
             log.error("{} {} -> {} {}", request.getMethod(), request.getRequestURI(), status.value(), title);
         }
         return ResponseEntity.status(status).body(problemDetail);
+    }
+
+    private ResponseEntity<ProblemDetail> buildScrubbedErrorResponse(
+            HttpStatus status, String title, String safeDetail,
+            Exception ex, HttpServletRequest request) {
+        var response = buildErrorResponse(status, title, ex, request);
+        Objects.requireNonNull(response.getBody()).setDetail(safeDetail);
+        return response;
     }
 
     private ProblemDetail createBaseProblemDetail(

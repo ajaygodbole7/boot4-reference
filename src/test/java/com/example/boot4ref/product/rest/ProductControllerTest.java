@@ -352,8 +352,8 @@ class ProductControllerTest {
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/409"))
-                .andExpect(jsonPath("$.title").value("Optimistic Lock Conflict"))
-                .andExpect(jsonPath("$.detail").value("Resource was modified by another request"));
+                .andExpect(jsonPath("$.title").value("Concurrency Conflict"))
+                .andExpect(jsonPath("$.detail").value("Concurrent modification conflict, please retry"));
     }
 
     // =========== PATCH /api/products/{id} ===========
@@ -423,8 +423,8 @@ class ProductControllerTest {
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/409"))
-                .andExpect(jsonPath("$.title").value("Optimistic Lock Conflict"))
-                .andExpect(jsonPath("$.detail").value("Resource was modified by another request"));
+                .andExpect(jsonPath("$.title").value("Concurrency Conflict"))
+                .andExpect(jsonPath("$.detail").value("Concurrent modification conflict, please retry"));
     }
 
     // =========== DELETE /api/products/{id} ===========

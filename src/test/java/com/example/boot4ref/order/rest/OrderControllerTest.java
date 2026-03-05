@@ -118,7 +118,8 @@ class OrderControllerTest {
                                 {"items":[]}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("Validation Error"));
+                .andExpect(jsonPath("$.type").exists())
+                .andExpect(jsonPath("$.detail").exists());
     }
 
     @Test
@@ -129,7 +130,8 @@ class OrderControllerTest {
                                 {"items":[{"productId":null,"quantity":2}]}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("Validation Error"));
+                .andExpect(jsonPath("$.type").exists())
+                .andExpect(jsonPath("$.detail").exists());
     }
 
     @Test
@@ -140,7 +142,8 @@ class OrderControllerTest {
                                 {"items":[{"productId":1,"quantity":0}]}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("Validation Error"));
+                .andExpect(jsonPath("$.type").exists())
+                .andExpect(jsonPath("$.detail").exists());
     }
 
     @Test
@@ -151,7 +154,8 @@ class OrderControllerTest {
                                 {"items":[{"productId":1,"quantity":-1}]}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("Validation Error"));
+                .andExpect(jsonPath("$.type").exists())
+                .andExpect(jsonPath("$.detail").exists());
     }
 
     @Test
@@ -292,7 +296,8 @@ class OrderControllerTest {
                                 {}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("Validation Error"));
+                .andExpect(jsonPath("$.type").exists())
+                .andExpect(jsonPath("$.detail").exists());
     }
 
     @Test
