@@ -105,12 +105,20 @@ if SKIP_BUILD="$SKIP_BUILD" "$SCRIPT_DIR/start-app.sh"; then
   record "App startup" "PASS"
 else
   record "App startup" "FAIL"
-  warn "App failed to start — attempting remaining stages anyway"
+  warn "App failed to start"
 fi
+
+# Gate: check if app is reachable before running stages that depend on it
+app_is_up() {
+  curl -sf "http://localhost:8081/actuator/health" -o /dev/null 2>/dev/null
+}
 
 # ── Stage 3: E2E tests ───────────────────────────────────────────────────────
 echo -e "\n${BOLD}${YELLOW}━━ Stage 3: E2E Tests ━━${NC}"
-if "$SCRIPT_DIR/e2e-test.sh"; then
+if ! app_is_up; then
+  record "E2E tests" "SKIP"
+  warn "App is not running — skipping E2E tests"
+elif "$SCRIPT_DIR/e2e-test.sh"; then
   record "E2E tests" "PASS"
 else
   record "E2E tests" "FAIL"
@@ -119,7 +127,10 @@ fi
 
 # ── Stage 4: Load test ───────────────────────────────────────────────────────
 echo -e "\n${BOLD}${YELLOW}━━ Stage 4: Load Test ($LOAD_ROUNDS rounds) ━━${NC}"
-if "$SCRIPT_DIR/load-test.sh" "$LOAD_ROUNDS"; then
+if ! app_is_up; then
+  record "Load test" "SKIP"
+  warn "App is not running — skipping load test"
+elif "$SCRIPT_DIR/load-test.sh" "$LOAD_ROUNDS"; then
   record "Load test" "PASS"
 else
   record "Load test" "FAIL"
