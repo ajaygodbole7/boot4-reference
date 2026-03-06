@@ -23,6 +23,18 @@ ok()      { echo -e "${GREEN}[${1}]${NC} ${2}"; }
 err()     { echo -e "${RED}[${1}]${NC} ${2}"; }
 section() { echo -e "\n${BOLD}${YELLOW}── $* ──${NC}"; }
 
+detect_python() {
+  for cmd in python3 python3.11 python3.12 python; do
+    if command -v "$cmd" &>/dev/null; then
+      PYTHON="$cmd"
+      return
+    fi
+  done
+  echo -e "${RED}[ERROR]${NC} Python not found. Install python3 and retry." >&2
+  exit 1
+}
+detect_python
+
 check_app() {
   if ! curl -sf "http://localhost:8081/actuator/health" -o /dev/null 2>/dev/null; then
     echo -e "${RED}[ERROR]${NC} App is not running at http://localhost:8080" >&2
@@ -39,7 +51,7 @@ http() {
 }
 
 json_field() {
-  python3 -c "import sys,json; print(json.load(open('/tmp/http_resp')).get('$1',''))" 2>/dev/null || echo ""
+  $PYTHON -c "import sys,json; print(json.load(open('/tmp/http_resp')).get('$1',''))" 2>/dev/null || echo ""
 }
 
 TOTAL_OK=0; TOTAL_ERR=0

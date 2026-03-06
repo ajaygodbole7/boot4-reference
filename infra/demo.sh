@@ -21,6 +21,18 @@ warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 pass()    { echo -e "  ${GREEN}PASS${NC}  $*"; }
 fail()    { echo -e "  ${RED}FAIL${NC}  $*"; }
 
+detect_python() {
+  for cmd in python3 python3.11 python3.12 python; do
+    if command -v "$cmd" &>/dev/null; then
+      PYTHON="$cmd"
+      return
+    fi
+  done
+  echo -e "${RED}[ERROR]${NC} Python not found. Install python3 and retry." >&2
+  exit 1
+}
+detect_python
+
 # ── Defaults ──────────────────────────────────────────────────────────────────
 CLEANUP=false
 SKIP_BUILD=false
@@ -117,9 +129,10 @@ fi
 # ── Stage 5: Verify observability ────────────────────────────────────────────
 echo -e "\n${BOLD}${YELLOW}━━ Stage 5: Verify Observability ━━${NC}"
 
-# OTel pipeline has inherent latency: collector batch processor (~5s) + backend WAL flush (~10s)
-info "Waiting 15s for OTel pipeline flush..."
-sleep 15
+# OTel pipeline has inherent latency: collector batch processor (~5s) + backend WAL flush (~10s).
+# Cold starts need extra time for backends to accept writes after container startup.
+info "Waiting 30s for OTel pipeline flush..."
+sleep 30
 
 OBS_PASS=0; OBS_FAIL=0
 NOW=$(date +%s)
@@ -127,7 +140,7 @@ START=$(( NOW - 300 ))
 
 # Prometheus — check for http_server_requests metric (Micrometer convention via Prometheus scrape)
 PROM_RESULT=$(curl -sf 'http://localhost:9090/api/v1/query?query=http_server_requests_seconds_count' 2>/dev/null || echo "")
-PROM_COUNT=$(echo "$PROM_RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('data',{}).get('result',[])))" 2>/dev/null || echo "0")
+PROM_COUNT=$(echo "$PROM_RESULT" | $PYTHON -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('data',{}).get('result',[])))" 2>/dev/null || echo "0")
 if [ "$PROM_COUNT" -gt 0 ] 2>/dev/null; then
   pass "Prometheus — $PROM_COUNT metric series"
   OBS_PASS=$((OBS_PASS+1))
@@ -142,7 +155,7 @@ TEMPO_RESULT=$(curl -sfG 'http://localhost:3200/api/search' \
   --data-urlencode "start=$START" \
   --data-urlencode "end=$NOW" \
   --data-urlencode 'limit=5' 2>/dev/null || echo "")
-TEMPO_COUNT=$(echo "$TEMPO_RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('traces',[])))" 2>/dev/null || echo "0")
+TEMPO_COUNT=$(echo "$TEMPO_RESULT" | $PYTHON -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('traces',[])))" 2>/dev/null || echo "0")
 if [ "$TEMPO_COUNT" -gt 0 ] 2>/dev/null; then
   pass "Tempo — $TEMPO_COUNT traces found"
   OBS_PASS=$((OBS_PASS+1))
@@ -157,7 +170,7 @@ LOKI_RESULT=$(curl -sfG 'http://localhost:3100/loki/api/v1/query_range' \
   --data-urlencode "start=$START" \
   --data-urlencode "end=$NOW" \
   --data-urlencode 'limit=5' 2>/dev/null || echo "")
-LOKI_COUNT=$(echo "$LOKI_RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('data',{}).get('result',[])))" 2>/dev/null || echo "0")
+LOKI_COUNT=$(echo "$LOKI_RESULT" | $PYTHON -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('data',{}).get('result',[])))" 2>/dev/null || echo "0")
 if [ "$LOKI_COUNT" -gt 0 ] 2>/dev/null; then
   pass "Loki — $LOKI_COUNT log streams"
   OBS_PASS=$((OBS_PASS+1))
