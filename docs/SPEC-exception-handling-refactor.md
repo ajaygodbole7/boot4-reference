@@ -105,9 +105,12 @@ DataAccessException
 ├── NonTransientDataAccessException
 │   └── DataIntegrityViolationException          → 409 (own handler)
 └── TransientDataAccessException                 → 503 (Task 1 handler)
-    ├── DataAccessResourceFailureException       → 503 (via TransientDataAccess)
-    ├── QueryTimeoutException                    → 503 (via TransientDataAccess)
     ├── TransientDataAccessResourceException     → 503 (via TransientDataAccess)
+    ├── QueryTimeoutException                    → 503 (via TransientDataAccess)
+    │   NOTE: DataAccessResourceFailureException is NOT shown here — it actually
+    │   extends NonTransientDataAccessResourceException (non-transient), not
+    │   TransientDataAccessException. The handler and tests correctly use
+    │   TransientDataAccessResourceException instead.
     └── ConcurrencyFailureException              → 409 (Task 2 handler, MORE SPECIFIC)
         ├── ObjectOptimisticLockingFailureException  → 409 (via ConcurrencyFailure)
         └── PessimisticLockingFailureException       → 409 (via ConcurrencyFailure)

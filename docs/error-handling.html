@@ -96,8 +96,8 @@
   <tr><td><code>ResourceConflictException</code></td><td><span class="status s4xx">409</span> Conflict</td><td>Invalid status transition (e.g. DRAFT → DISCONTINUED)</td></tr>
   <tr><td><code>BusinessRuleException</code></td><td><span class="status s4xx">422</span> Unprocessable Entity</td><td>Non-ACTIVE product in order, insufficient stock, duplicate product IDs</td></tr>
   <tr><td><code>ServiceUnavailableException</code></td><td><span class="status s5xx">503</span> Service Unavailable</td><td>Downstream dependency unreachable</td></tr>
-  <tr><td><code>ObjectOptimisticLockingFailureException</code></td><td><span class="status s4xx">409</span> Conflict</td><td>Stale version on PUT/PATCH (concurrent update)</td></tr>
-  <tr><td><code>PessimisticLockingFailureException</code></td><td><span class="status s4xx">409</span> Conflict</td><td>Lock timeout waiting for a row held by another transaction (e.g., concurrent order placement)</td></tr>
+  <tr><td><code>ConcurrencyFailureException</code></td><td><span class="status s4xx">409</span> Conflict</td><td>Optimistic lock (stale version) or pessimistic lock timeout — covers <code>ObjectOptimisticLockingFailureException</code> and <code>PessimisticLockingFailureException</code></td></tr>
+  <tr><td><code>TransientDataAccessException</code></td><td><span class="status s5xx">503</span> Service Unavailable</td><td>DB connection refused, query timeout, transient resource failure. <code>ConcurrencyFailureException</code> (a subclass) is routed to 409 by its more-specific handler</td></tr>
   <tr><td><code>MethodArgumentNotValidException</code></td><td><span class="status s4xx">400</span> Bad Request</td><td>Bean validation failure (<code>@NotNull</code>, <code>@Positive</code>, etc.)</td></tr>
   <tr><td><code>HttpMessageNotReadableException</code></td><td><span class="status s4xx">400</span> Bad Request</td><td>Malformed JSON body</td></tr>
   <tr><td><code>MethodArgumentTypeMismatchException</code></td><td><span class="status s4xx">400</span> Bad Request</td><td>Path/query param type conversion failure</td></tr>
@@ -182,9 +182,14 @@ The <code>ExceptionTranslator</code> catches the base types, so subclasses are h
 
 <p><code>@RestControllerAdvice</code> with <code>@Order(Ordered.HIGHEST_PRECEDENCE)</code> — runs before Spring's defaults. Each exception type has a dedicated <code>@ExceptionHandler</code> method.</p>
 
-<p>Most handlers delegate to <code>buildErrorResponse()</code> which logs at WARN for 4xx. Some handlers
-(validation, JSON parse, type mismatch, method validation) use <code>createBaseProblemDetail()</code>
-directly for custom response shaping — these do not emit a WARN log entry.</p>
+<p>Most handlers delegate to <code>buildErrorResponse()</code> which logs at WARN for 4xx, ERROR for 5xx.
+Validation and parse handlers use <code>createBaseProblemDetail()</code> directly for custom response
+shaping, but each includes its own <code>log.warn</code> call — all handlers log consistently.</p>
+
+<p>Handlers that must scrub raw exception messages (lock conflicts, transient failures, data integrity,
+catch-all) use <code>buildScrubbedErrorResponse()</code>, which delegates to <code>buildErrorResponse()</code>
+and immediately overwrites the detail with a safe, fixed string. The JSON parse handler scrubs
+differently: generic detail in production, raw Jackson message in dev-profile <code>$.parseError</code>.</p>
 
 <ol>
   <li>Creates a <code>ProblemDetail</code> instance with status, title, and detail</li>
@@ -192,7 +197,7 @@ directly for custom response shaping — these do not emit a WARN log entry.</p>
   <li>Sets <code>instance</code> to the request URI</li>
   <li>Adds custom properties: <code>errorCode</code>, <code>timestamp</code>, <code>request</code> metadata</li>
   <li>In dev profile: adds <code>exception</code> (class name) and <code>stackTrace</code></li>
-  <li>Domain/locking handlers: WARN for 4xx, ERROR for 5xx. Validation handlers: no log (high volume, low signal)</li>
+  <li>Logs: INFO for 404, WARN for other 4xx, ERROR for 5xx</li>
   <li>Returns <code>ResponseEntity&lt;ProblemDetail&gt;</code></li>
 </ol>
 
@@ -221,6 +226,7 @@ individual field errors and includes them as an <code>errors</code> array in the
   <tr><td><code>detail</code></td><td>Exception message (4xx), hardcoded generic message (5xx)</td><td>Exception message (4xx), hardcoded generic message (5xx)</td></tr>
   <tr><td><code>exception</code></td><td>Fully-qualified class name</td><td>Omitted</td></tr>
   <tr><td><code>stackTrace</code></td><td>Full stack trace string</td><td>Omitted</td></tr>
+  <tr><td><code>parseError</code></td><td>Raw Jackson parse message (JSON parse errors only)</td><td>Omitted</td></tr>
 </table>
 
 <p>The translator checks <code>env.acceptsProfiles(Profiles.of("dev"))</code>. Dev gets stack traces for debugging. Production doesn't leak internals.</p>
