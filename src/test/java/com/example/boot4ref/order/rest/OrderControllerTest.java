@@ -164,7 +164,7 @@ class OrderControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{broken"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/400"))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/malformed-json"))
                 .andExpect(jsonPath("$.title").value("Malformed JSON"));
     }
 
@@ -187,8 +187,8 @@ class OrderControllerTest {
                                 {"items":[{"productId":999,"quantity":1}]}
                                 """))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/404"))
-                .andExpect(jsonPath("$.title").value("Resource Not Found"));
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/product-not-found"))
+                .andExpect(jsonPath("$.title").value("Product Not Found"));
     }
 
     // =========== GET /api/orders/{id} ===========
@@ -214,8 +214,8 @@ class OrderControllerTest {
 
         mockMvc.perform(get("/api/orders/99"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/404"))
-                .andExpect(jsonPath("$.title").value("Resource Not Found"));
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/order-not-found"))
+                .andExpect(jsonPath("$.title").value("Order Not Found"));
     }
 
     // =========== GET /api/orders ===========
@@ -270,8 +270,8 @@ class OrderControllerTest {
                                 {"status":"SHIPPED"}
                                 """))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/409"))
-                .andExpect(jsonPath("$.title").value("Resource Conflict"));
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/order-conflict"))
+                .andExpect(jsonPath("$.title").value("Order Conflict"));
     }
 
     @Test
@@ -285,7 +285,7 @@ class OrderControllerTest {
                                 {"status":"CONFIRMED"}
                                 """))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.title").value("Resource Not Found"));
+                .andExpect(jsonPath("$.title").value("Order Not Found"));
     }
 
     @Test
@@ -319,10 +319,13 @@ class OrderControllerTest {
                                 {"items":[{"productId":1,"quantity":100}]}
                                 """))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/422"))
-                .andExpect(jsonPath("$.title").value("Business Rule Violation"))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/insufficient-stock"))
+                .andExpect(jsonPath("$.title").value("Insufficient Stock"))
                 .andExpect(jsonPath("$.detail").value(
-                        "Insufficient stock for product 1: requested 100, available 5"));
+                        "Insufficient stock for product 1: requested 100, available 5"))
+                .andExpect(jsonPath("$.productId").value(1))
+                .andExpect(jsonPath("$.requested").value(100))
+                .andExpect(jsonPath("$.available").value(5));
     }
 
     @Test
@@ -336,10 +339,12 @@ class OrderControllerTest {
                                 {"items":[{"productId":1,"quantity":1}]}
                                 """))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/422"))
-                .andExpect(jsonPath("$.title").value("Business Rule Violation"))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/unorderable-product"))
+                .andExpect(jsonPath("$.title").value("Unorderable Product"))
                 .andExpect(jsonPath("$.detail").value(
-                        "Product 1 is DISCONTINUED and cannot be ordered"));
+                        "Product 1 is DISCONTINUED and cannot be ordered"))
+                .andExpect(jsonPath("$.productId").value(1))
+                .andExpect(jsonPath("$.productStatus").value("DISCONTINUED"));
     }
 
     @Test
@@ -353,8 +358,8 @@ class OrderControllerTest {
                                 {"items":[{"productId":1,"quantity":1}]}
                                 """))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/422"))
-                .andExpect(jsonPath("$.title").value("Business Rule Violation"))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/unorderable-product"))
+                .andExpect(jsonPath("$.title").value("Unorderable Product"))
                 .andExpect(jsonPath("$.detail").value(
                         "Product 1 is DRAFT and cannot be ordered"));
     }
@@ -370,10 +375,11 @@ class OrderControllerTest {
                                 {"items":[{"productId":1,"quantity":2},{"productId":1,"quantity":3}]}
                                 """))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/422"))
-                .andExpect(jsonPath("$.title").value("Business Rule Violation"))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/duplicate-line-item"))
+                .andExpect(jsonPath("$.title").value("Duplicate Line Item"))
                 .andExpect(jsonPath("$.detail").value(
-                        "Duplicate product ID 1 in order items"));
+                        "Duplicate product ID 1 in order items"))
+                .andExpect(jsonPath("$.productId").value(1));
     }
 
     // =========== Filtering ===========

@@ -80,10 +80,10 @@ class ProductControllerTest {
                                 {"name":"","description":"A product","price":10.00,"stock":5}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/400"))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/request-body-validation-error"))
                 .andExpect(jsonPath("$.title").value("Validation Error"))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errorCode").value("REQUEST_BODY_VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.errors").isArray())
                 .andExpect(jsonPath("$.errors[?(@.field == 'name')]").exists())
                 .andExpect(jsonPath("$.errors[?(@.field == 'name')].rejectedValue").exists())
@@ -100,7 +100,7 @@ class ProductControllerTest {
                                 {"name":"Valid Name","description":"desc","price":-5.00,"stock":5}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/400"))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/request-body-validation-error"))
                 .andExpect(jsonPath("$.title").value("Validation Error"))
                 .andExpect(jsonPath("$.errors").isArray())
                 .andExpect(jsonPath("$.errors[?(@.field == 'price')]").exists());
@@ -115,7 +115,7 @@ class ProductControllerTest {
                                 {"name":"%s","description":"desc","price":10.00,"stock":5}
                                 """.formatted(longName)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/400"))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/request-body-validation-error"))
                 .andExpect(jsonPath("$.title").value("Validation Error"))
                 .andExpect(jsonPath("$.errors").isArray())
                 .andExpect(jsonPath("$.errors[?(@.field == 'name')]").exists());
@@ -129,7 +129,7 @@ class ProductControllerTest {
                                 {"name":"","description":"desc","price":-1.00,"stock":5}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/400"))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/request-body-validation-error"))
                 .andExpect(jsonPath("$.title").value("Validation Error"))
                 .andExpect(jsonPath("$.errors").isArray())
                 .andExpect(jsonPath("$.errors.length()").value(
@@ -142,7 +142,7 @@ class ProductControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{broken"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/400"))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/malformed-json"))
                 .andExpect(jsonPath("$.title").value("Malformed JSON"))
                 .andExpect(jsonPath("$.detail").exists());
     }
@@ -295,8 +295,8 @@ class ProductControllerTest {
 
         mockMvc.perform(get("/api/products/99"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/404"))
-                .andExpect(jsonPath("$.title").value("Resource Not Found"));
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/product-not-found"))
+                .andExpect(jsonPath("$.title").value("Product Not Found"));
     }
 
     // =========== PUT /api/products/{id} ===========
@@ -325,7 +325,7 @@ class ProductControllerTest {
                                 {"name":"Widget","price":9.99,"stock":0}
                                 """))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.title").value("Resource Not Found"));
+                .andExpect(jsonPath("$.title").value("Product Not Found"));
     }
 
     @Test
@@ -351,7 +351,7 @@ class ProductControllerTest {
                                 {"name":"Widget","description":"desc","price":9.99,"stock":5}
                                 """))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/409"))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/concurrency-conflict"))
                 .andExpect(jsonPath("$.title").value("Concurrency Conflict"))
                 .andExpect(jsonPath("$.detail").value("Concurrent modification conflict, please retry"));
     }
@@ -407,7 +407,7 @@ class ProductControllerTest {
                                 {"name":"Updated"}
                                 """))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.title").value("Resource Not Found"));
+                .andExpect(jsonPath("$.title").value("Product Not Found"));
     }
 
     @Test
@@ -422,7 +422,7 @@ class ProductControllerTest {
                                 {"name":"New Name"}
                                 """))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/409"))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/concurrency-conflict"))
                 .andExpect(jsonPath("$.title").value("Concurrency Conflict"))
                 .andExpect(jsonPath("$.detail").value("Concurrent modification conflict, please retry"));
     }
@@ -443,7 +443,7 @@ class ProductControllerTest {
 
         mockMvc.perform(delete("/api/products/99"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.title").value("Resource Not Found"));
+                .andExpect(jsonPath("$.title").value("Product Not Found"));
     }
 
     @Test
@@ -453,8 +453,8 @@ class ProductControllerTest {
 
         mockMvc.perform(delete("/api/products/42"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/409"))
-                .andExpect(jsonPath("$.title").value("Resource Conflict"));
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/product-conflict"))
+                .andExpect(jsonPath("$.title").value("Product Conflict"));
     }
 
     // =========== Status transition: POST /api/products/{id}/status ===========
@@ -490,8 +490,8 @@ class ProductControllerTest {
                                 {"status":"DRAFT"}
                                 """))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/409"))
-                .andExpect(jsonPath("$.title").value("Resource Conflict"));
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/product-conflict"))
+                .andExpect(jsonPath("$.title").value("Product Conflict"));
     }
 
     @Test
@@ -505,6 +505,6 @@ class ProductControllerTest {
                                 {"status":"ACTIVE"}
                                 """))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.title").value("Resource Not Found"));
+                .andExpect(jsonPath("$.title").value("Product Not Found"));
     }
 }

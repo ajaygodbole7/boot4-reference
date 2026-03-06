@@ -3,6 +3,7 @@ package com.example.boot4ref.common.exception;
 /**
  * Exception for service-unavailable errors. Maps to HTTP 503.
  */
+@ProblemType(slug = "service-unavailable", title = "Service Unavailable")
 public class ServiceUnavailableException extends RuntimeException {
 
     public ServiceUnavailableException(String message) {

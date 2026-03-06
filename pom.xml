@@ -100,12 +100,6 @@
             <version>2.1.4</version>
         </dependency>
 
-        <!-- Commons Lang3 — ExceptionUtils for dev-profile debug info -->
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
-        </dependency>
-
         <!-- JSpecify — null safety annotations -->
         <dependency>
             <groupId>org.jspecify</groupId>

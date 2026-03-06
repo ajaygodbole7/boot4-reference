@@ -17,8 +17,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Verifies that dev profile adds exception class and stack trace to RFC 9457 responses.
- * Separate test class because it requires a different Spring profile.
+ * Verifies that dev profile adds exception class, stack trace, and request metadata
+ * to RFC 9457 responses. Separate test class because it requires a different Spring profile.
  */
 @WebMvcTest(controllers = ExceptionTranslatorTest.TestController.class)
 @Import({ExceptionTranslator.class, ExceptionTranslatorTest.TestController.class})
@@ -35,9 +35,10 @@ class ExceptionTranslatorDevProfileTest {
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.exception").value("java.lang.RuntimeException"))
                 .andExpect(jsonPath("$.stackTrace").exists())
-                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/500"))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/internal-server-error"))
                 .andExpect(jsonPath("$.title").value("Internal Server Error"))
-                .andExpect(jsonPath("$.detail").value("An unexpected internal error occurred"));
+                .andExpect(jsonPath("$.detail").value("An unexpected internal error occurred"))
+                .andExpect(jsonPath("$.request").exists());
     }
 
     @Test
@@ -48,5 +49,17 @@ class ExceptionTranslatorDevProfileTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("Malformed JSON request body"))
                 .andExpect(jsonPath("$.parseError").exists());
+    }
+
+    @Test
+    void shouldIncludeRequestMetadataInDevProfile() throws Exception {
+        mockMvc.perform(get("/test/not-found")
+                        .header("User-Agent", "JUnit")
+                        .header("X-Request-Id", "req-456"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.request.httpMethod").value("GET"))
+                .andExpect(jsonPath("$.request.requestPath").value("/test/not-found"))
+                .andExpect(jsonPath("$.request.userAgent").value("JUnit"))
+                .andExpect(jsonPath("$.request.requestId").value("req-456"));
     }
 }

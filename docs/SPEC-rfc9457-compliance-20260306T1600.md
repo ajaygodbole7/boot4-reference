@@ -1,5 +1,26 @@
 # SPEC: RFC 9457 Compliance + Reusable Exception Pattern
 
+**Status: IMPLEMENTED** — all 13 tasks complete, 191 tests passing (0 failures).
+
+## Review Resolutions
+
+Review `REVIEW-rfc9457-spec-20260306T1434.md` identified 6 must-fix, 5 should-fix, 3 nice-to-have.
+Resolutions applied during implementation:
+
+| # | Issue | Resolution |
+|---|-------|------------|
+| F1 | 10 vs 11 count | Fixed to 11 |
+| F2 | `@ProblemType` on abstract class dead without `@Inherited` | Added `@Inherited` to annotation |
+| F3 | Status override risk | Removed `status()` from `@ProblemType` — handler determines status |
+| D1/D2 | Task 5/10 collision | Merged Retry-After into final handler form; infrastructure handlers inline construction |
+| D4 | Missing `application/problem+json` | Added `.contentType(MediaType.APPLICATION_PROBLEM_JSON)` to all response builders |
+| S1/D3 | Shared `validation-error` slug | Split: `request-body-validation-error` / `parameter-validation-error` |
+| S3 | `buildScrubbedErrorResponse` ordering | Accepted: transient in-memory only, never serialized |
+| S4 | Testing gaps | Added traceId fallback test, Retry-After header tests, annotation/property tests |
+| R2 | Phase B "non-breaking" label | Phase B IS breaking (annotated exceptions change `type`/`errorCode`) |
+
+---
+
 ## Objective
 
 Fix three RFC 9457 violations in the `ExceptionTranslator`, add missing observability and
@@ -37,7 +58,7 @@ Each criterion maps to one or more testable assertions.
 5. Both 503 handlers include a `Retry-After` response header (configurable via `app.retry-after-seconds`)
 6. `commons-lang3` dependency removed from production; `ExceptionUtils.getStackTrace()` replaced with `StringWriter`/`PrintWriter`
 7. Stack traces truncated by frame count (50 frames) instead of char count (5000 chars)
-8. `@ProblemType` annotation exists and is readable on all 10 domain exception classes
+8. `@ProblemType` annotation exists and is readable on all 11 domain exception classes
 9. `ProblemPropertySource` interface exists and is implemented by 3 business rule exceptions
 10. `buildDomainErrorResponse` reads `@ProblemType` with fallback to handler defaults
 11. Annotated leaf exceptions produce specific `type` URIs and `errorCode` values

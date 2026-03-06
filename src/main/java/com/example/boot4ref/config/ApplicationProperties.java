@@ -22,6 +22,10 @@ public class ApplicationProperties {
     @NotNull
     private Outbox outbox = new Outbox();
 
+    @NotNull
+    @Min(1)
+    private Integer retryAfterSeconds = 30;
+
     @Valid
     @NotNull
     private Kafka kafka = new Kafka();
@@ -34,6 +38,9 @@ public class ApplicationProperties {
 
     public Outbox getOutbox() { return outbox; }
     public void setOutbox(Outbox outbox) { this.outbox = outbox; }
+
+    public Integer getRetryAfterSeconds() { return retryAfterSeconds; }
+    public void setRetryAfterSeconds(Integer retryAfterSeconds) { this.retryAfterSeconds = retryAfterSeconds; }
 
     public Kafka getKafka() { return kafka; }
     public void setKafka(Kafka kafka) { this.kafka = kafka; }
