@@ -167,7 +167,7 @@ services:
   #     SPRING_DATASOURCE_USERNAME: boot4user
   #     SPRING_DATASOURCE_PASSWORD: boot4pass
   #     KAFKA_BOOTSTRAP_SERVERS: kafka:19092
-  #     MANAGEMENT_OTLP_TRACING_ENDPOINT: http://otel-collector:4318/v1/traces
+  #     MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
   #     STRUCTURED_LOGGING: "true"
   #   ports:
   #     - "8080:8080"

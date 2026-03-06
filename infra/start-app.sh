@@ -52,7 +52,7 @@ fi
 
 # ── Start app ─────────────────────────────────────────────────────────────────
 # Boot 4 uses spring-boot-starter-opentelemetry — no Java agent needed.
-# OTel export configured via application.properties (management.otlp.*)
+# OTel export configured via application.properties (management.opentelemetry.*)
 info "Starting app in background → log: $LOG_FILE"
 "$JAVA_BIN" \
   -Dspring.profiles.active=dev \

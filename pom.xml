@@ -59,6 +59,20 @@
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
 
+        <!-- OTel Logback appender — bridges SLF4J/Logback logs into OTel SDK.
+             Version 2.16.0-alpha targets OTel API 1.50.0; Boot 4 overrides to 1.55.0.
+             The api-incubator module must be added explicitly (not in Boot BOM). -->
+        <dependency>
+            <groupId>io.opentelemetry.instrumentation</groupId>
+            <artifactId>opentelemetry-logback-appender-1.0</artifactId>
+            <version>2.16.0-alpha</version>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api-incubator</artifactId>
+            <version>${opentelemetry.version}-alpha</version>
+        </dependency>
+
         <!-- Flyway — STARTER required in Boot 4, not flyway-core alone -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
