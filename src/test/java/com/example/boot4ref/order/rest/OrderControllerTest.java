@@ -285,6 +285,7 @@ class OrderControllerTest {
                                 {"status":"CONFIRMED"}
                                 """))
                 .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/order-not-found"))
                 .andExpect(jsonPath("$.title").value("Order Not Found"));
     }
 

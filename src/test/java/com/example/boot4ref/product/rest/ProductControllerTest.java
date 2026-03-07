@@ -325,6 +325,7 @@ class ProductControllerTest {
                                 {"name":"Widget","price":9.99,"stock":0}
                                 """))
                 .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/product-not-found"))
                 .andExpect(jsonPath("$.title").value("Product Not Found"));
     }
 
@@ -407,6 +408,7 @@ class ProductControllerTest {
                                 {"name":"Updated"}
                                 """))
                 .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/product-not-found"))
                 .andExpect(jsonPath("$.title").value("Product Not Found"));
     }
 
@@ -443,6 +445,7 @@ class ProductControllerTest {
 
         mockMvc.perform(delete("/api/products/99"))
                 .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/product-not-found"))
                 .andExpect(jsonPath("$.title").value("Product Not Found"));
     }
 
@@ -505,6 +508,7 @@ class ProductControllerTest {
                                 {"status":"ACTIVE"}
                                 """))
                 .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/product-not-found"))
                 .andExpect(jsonPath("$.title").value("Product Not Found"));
     }
 }

@@ -429,9 +429,9 @@ Changes per test method:
 | `shouldReturn409WhenProductConflictExceptionThrown` | `$.type` → `.../errors/resource-conflict` |
 | `shouldReturn409WhenOrderConflictExceptionThrown` | `$.type` → `.../errors/resource-conflict` |
 | `shouldReturn503WhenServiceUnavailable` | `$.type` → `.../errors/service-unavailable`; remove `$.request` exists; add `$.traceId` exists; add `Retry-After` header assertion |
-| `shouldReturn400WithFieldErrorsWhenMethodArgumentNotValid` | `$.type` → `.../errors/validation-error`; add `$.traceId` exists |
+| `shouldReturn400WithFieldErrorsWhenMethodArgumentNotValid` | `$.type` → `.../errors/request-body-validation-error`; add `$.traceId` exists |
 | `shouldReturn400WhenConstraintViolation` | `$.type` → `.../errors/constraint-violation`; add `$.traceId` exists |
-| `shouldReturn400WithValidationErrorsWhenHandlerMethodValidation` | `$.type` → `.../errors/validation-error` |
+| `shouldReturn400WithValidationErrorsWhenHandlerMethodValidation` | `$.type` → `.../errors/parameter-validation-error` |
 | `shouldReturn400WhenTypeMismatch` | `$.type` → `.../errors/invalid-path-variable` |
 | `shouldReturn400WhenMalformedJson` | `$.type` → `.../errors/malformed-json` |
 | `shouldReturn503WhenTransientDataAccessFailure` | `$.type` → `.../errors/service-temporarily-unavailable`; remove `$.request` exists; add `$.traceId` exists; add `Retry-After` header assertion |
@@ -501,6 +501,7 @@ Additive changes. No breaking API changes beyond what Phase A already introduced
 package com.example.boot4ref.common.exception;
 
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
@@ -510,13 +511,16 @@ import java.lang.annotation.Target;
  * The handler reads this annotation to produce slug-based type URIs,
  * stable errorCode values, and specific titles.
  *
+ * {@code @Inherited} ensures annotations on abstract base classes propagate
+ * to subclasses (including anonymous subclasses) via {@code getAnnotation()}.
+ *
  * Applied to exception classes. If absent, the handler falls back to
  * hardcoded defaults in the handler method.
  */
+@Inherited
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProblemType {
-    int status();
     String slug();
     String title();
 }
@@ -569,21 +573,20 @@ private ResponseEntity<ProblemDetail> buildDomainErrorResponse(
             .computeIfAbsent(ex.getClass(),
                     cls -> Optional.ofNullable(cls.getAnnotation(ProblemType.class)))
             .orElse(null);
-    HttpStatus status = pt != null ? HttpStatus.valueOf(pt.status()) : defaultStatus;
     String slug = pt != null ? pt.slug() : defaultSlug;
     String title = pt != null ? pt.title() : defaultTitle;
-    ProblemDetail pd = createBaseProblemDetail(status, slug, title, ex, request);
+    ProblemDetail pd = createBaseProblemDetail(defaultStatus, slug, title, ex, request);
     if (ex instanceof ProblemPropertySource source) {
         source.problemProperties().forEach(pd::setProperty);
     }
-    if (status == HttpStatus.NOT_FOUND) {
-        log.info("{} {} -> {} {}", request.getMethod(), request.getRequestURI(), status.value(), title);
-    } else if (status.is4xxClientError()) {
-        log.warn("{} {} -> {} {}", request.getMethod(), request.getRequestURI(), status.value(), title);
-    } else if (status.is5xxServerError()) {
-        log.error("{} {} -> {} {}", request.getMethod(), request.getRequestURI(), status.value(), title);
+    if (defaultStatus == HttpStatus.NOT_FOUND) {
+        log.info("{} {} -> {} {}", request.getMethod(), request.getRequestURI(), defaultStatus.value(), title);
+    } else if (defaultStatus.is4xxClientError()) {
+        log.warn("{} {} -> {} {}", request.getMethod(), request.getRequestURI(), defaultStatus.value(), title);
+    } else if (defaultStatus.is5xxServerError()) {
+        log.error("{} {} -> {} {}", request.getMethod(), request.getRequestURI(), defaultStatus.value(), title);
     }
-    return ResponseEntity.status(status).body(pd);
+    return ResponseEntity.status(defaultStatus).body(pd);
 }
 ```
 
@@ -639,19 +642,19 @@ Apply `@ProblemType` to each exception class. Import: `com.example.boot4ref.comm
 
 | Exception class | `@ProblemType` values |
 |----------------|----------------------|
-| `ResourceNotFoundException` | `status = 404, slug = "resource-not-found", title = "Resource Not Found"` |
-| `ProductNotFoundException` | `status = 404, slug = "product-not-found", title = "Product Not Found"` |
-| `OrderNotFoundException` | `status = 404, slug = "order-not-found", title = "Order Not Found"` |
-| `ResourceConflictException` | `status = 409, slug = "resource-conflict", title = "Resource Conflict"` |
-| `ProductConflictException` | `status = 409, slug = "product-conflict", title = "Product Conflict"` |
-| `OrderConflictException` | `status = 409, slug = "order-conflict", title = "Order Conflict"` |
-| `BusinessRuleException` | `status = 422, slug = "business-rule-violation", title = "Business Rule Violation"` |
-| `InsufficientStockException` | `status = 422, slug = "insufficient-stock", title = "Insufficient Stock"` |
-| `UnorderableProductException` | `status = 422, slug = "unorderable-product", title = "Unorderable Product"` |
-| `DuplicateLineItemException` | `status = 422, slug = "duplicate-line-item", title = "Duplicate Line Item"` |
+| `ResourceNotFoundException` | `slug = "resource-not-found", title = "Resource Not Found"` |
+| `ProductNotFoundException` | `slug = "product-not-found", title = "Product Not Found"` |
+| `OrderNotFoundException` | `slug = "order-not-found", title = "Order Not Found"` |
+| `ResourceConflictException` | `slug = "resource-conflict", title = "Resource Conflict"` |
+| `ProductConflictException` | `slug = "product-conflict", title = "Product Conflict"` |
+| `OrderConflictException` | `slug = "order-conflict", title = "Order Conflict"` |
+| `BusinessRuleException` | `slug = "business-rule-violation", title = "Business Rule Violation"` |
+| `InsufficientStockException` | `slug = "insufficient-stock", title = "Insufficient Stock"` |
+| `UnorderableProductException` | `slug = "unorderable-product", title = "Unorderable Product"` |
+| `DuplicateLineItemException` | `slug = "duplicate-line-item", title = "Duplicate Line Item"` |
 
 Note: `ServiceUnavailableException` also gets annotated:
-| `ServiceUnavailableException` | `status = 503, slug = "service-unavailable", title = "Service Unavailable"` |
+| `ServiceUnavailableException` | `slug = "service-unavailable", title = "Service Unavailable"` |
 
 That's 11 classes total (4 base + 7 leaf).
 
@@ -664,7 +667,7 @@ That's 11 classes total (4 base + 7 leaf).
 Store constructor args as fields. Implement `ProblemPropertySource`:
 
 ```java
-@ProblemType(status = 422, slug = "insufficient-stock", title = "Insufficient Stock")
+@ProblemType(slug = "insufficient-stock", title = "Insufficient Stock")
 public final class InsufficientStockException extends BusinessRuleException
         implements ProblemPropertySource {
 
@@ -690,7 +693,7 @@ public final class InsufficientStockException extends BusinessRuleException
 **File:** `src/main/java/.../order/exception/UnorderableProductException.java`
 
 ```java
-@ProblemType(status = 422, slug = "unorderable-product", title = "Unorderable Product")
+@ProblemType(slug = "unorderable-product", title = "Unorderable Product")
 public final class UnorderableProductException extends BusinessRuleException
         implements ProblemPropertySource {
 
@@ -713,7 +716,7 @@ public final class UnorderableProductException extends BusinessRuleException
 **File:** `src/main/java/.../order/exception/DuplicateLineItemException.java`
 
 ```java
-@ProblemType(status = 422, slug = "duplicate-line-item", title = "Duplicate Line Item")
+@ProblemType(slug = "duplicate-line-item", title = "Duplicate Line Item")
 public final class DuplicateLineItemException extends BusinessRuleException
         implements ProblemPropertySource {
 
@@ -854,8 +857,8 @@ Every handler method → slug → `type` URI → `errorCode`.
 | `handleConcurrencyFailure` | `ConcurrencyFailureException` | 409 | `concurrency-conflict` | `.../errors/concurrency-conflict` | `CONCURRENCY_CONFLICT` |
 | `handleTransientDataAccess` | `TransientDataAccessException` | 503 | `service-temporarily-unavailable` | `.../errors/service-temporarily-unavailable` | `SERVICE_TEMPORARILY_UNAVAILABLE` |
 | `handleDataIntegrityViolation` | `DataIntegrityViolationException` | 409 | `data-integrity-violation` | `.../errors/data-integrity-violation` | `DATA_INTEGRITY_VIOLATION` |
-| `handleValidationException` | `MethodArgumentNotValidException` | 400 | `validation-error` | `.../errors/validation-error` | `VALIDATION_ERROR` |
-| `handleMethodValidation` | `HandlerMethodValidationException` | 400 | `validation-error` | `.../errors/validation-error` | `VALIDATION_ERROR` |
+| `handleValidationException` | `MethodArgumentNotValidException` | 400 | `request-body-validation-error` | `.../errors/request-body-validation-error` | `REQUEST_BODY_VALIDATION_ERROR` |
+| `handleMethodValidation` | `HandlerMethodValidationException` | 400 | `parameter-validation-error` | `.../errors/parameter-validation-error` | `PARAMETER_VALIDATION_ERROR` |
 | `handleJsonParseError` | `HttpMessageNotReadableException` | 400 | `malformed-json` | `.../errors/malformed-json` | `MALFORMED_JSON` |
 | `handleConstraintViolation` | `ConstraintViolationException` | 400 | `constraint-violation` | `.../errors/constraint-violation` | `CONSTRAINT_VIOLATION` |
 | `handleTypeMismatch` | `MethodArgumentTypeMismatchException` | 400 | `invalid-path-variable` | `.../errors/invalid-path-variable` | `INVALID_PATH_VARIABLE` |
