@@ -36,7 +36,7 @@ public abstract class AbstractAuditingEntity {
             this.id = TsidFactory.nextId();
         }
         if (this.createdAt == null) {
-            var now = Instant.now();
+            Instant now = Instant.now();
             this.createdAt = now;
             this.updatedAt = now;
         }

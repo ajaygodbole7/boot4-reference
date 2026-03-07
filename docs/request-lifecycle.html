@@ -112,7 +112,7 @@
     ├─ Validate: no duplicate product IDs? active? stock?  ──→ 422 if violated
     ├─ Decrement stock, snapshot prices
     ├─ Save order + order lines
-    ├─ OutboxPublisher.publish()         ──→ same transaction
+    ├─ OutboxWriter.stageEvent()         ──→ same transaction
     │
     ▼
   COMMIT (order + stock + outbox = atomic)
@@ -221,7 +221,7 @@ for (OrderLineRequest item : sortedItems) {
   <li><strong>Price snapshot:</strong> the current product price is captured on each <code>OrderLine</code> — prices are not live references</li>
   <li><strong>Total computed:</strong> sum of (quantity &times; unit price) for all lines</li>
   <li><strong>Order saved:</strong> <code>orderRepository.save(order)</code> cascades to order lines (<code>CascadeType.ALL</code>)</li>
-  <li><strong>Outbox event:</strong> <code>outboxPublisher.publish(new DomainEvent.OrderPlaced(...))</code> inserts a CloudEvents-formatted row into <code>outbox_events</code> — <strong>in the same transaction</strong></li>
+  <li><strong>Outbox event:</strong> <code>outboxWriter.stageEvent(new DomainEvent.OrderPlaced(...))</code> inserts a CloudEvents-formatted row into <code>outbox_events</code> — <strong>in the same transaction</strong></li>
 </ol>
 
 <div class="callout">
@@ -247,7 +247,7 @@ This eliminates the dual-write problem. See <a href="outbox-pattern.html">Outbox
   <tr><td>Thin controller, fat service</td><td><code>OrderController</code> → <code>OrderService</code></td><td>Controllers do HTTP mapping only; services own business logic</td></tr>
   <tr><td>Pessimistic locking (sorted)</td><td><code>ProductRepository.findWithLockById()</code></td><td>Prevents deadlocks + ensures stock correctness</td></tr>
   <tr><td>Idempotency key</td><td><code>OrderService.create()</code></td><td>At-most-once order creation</td></tr>
-  <tr><td>Transactional outbox</td><td><code>OutboxPublisher.publish()</code></td><td>ACID-safe event publishing</td></tr>
+  <tr><td>Transactional outbox</td><td><code>OutboxWriter.stageEvent()</code></td><td>ACID-safe event publishing</td></tr>
   <tr><td>Price snapshotting</td><td><code>OrderLine.unitPrice</code></td><td>Order total doesn't change if product price changes later</td></tr>
   <tr><td>Cascade + orphan removal</td><td><code>Order.orderLines</code></td><td>Parent manages child lifecycle</td></tr>
   <tr><td>Global exception translation</td><td><code>ExceptionTranslator</code></td><td>Consistent RFC 9457 error responses</td></tr>

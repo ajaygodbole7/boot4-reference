@@ -95,11 +95,11 @@
 <hr>
 
 <h2 id="flow-diagram">Flow Diagram</h2>
-<pre><code>OrderService                    OutboxPublisher              OutboxPoller
+<pre><code>OrderService                    OutboxWriter                 OutboxPoller
     |                               |                            |
     |-- @Transactional -------------|                            |
     |   orderRepository.save()      |                            |
-    |   outboxPublisher.publish()---|                            |
+    |   outboxWriter.stageEvent()--|                            |
     |   |  resolveEventType()       |                            |
     |   |  buildCloudEventsPayload()|                            |
     |   |  outboxEventRepo.save()   |                            |
@@ -142,7 +142,7 @@ public OrderResponse create(OrderCreateRequest request, String idempotencyKey) {
     Order saved = orderRepository.save(order);
 
     // 2. Outbox write: same transaction, same database
-    outboxPublisher.publish(new DomainEvent.OrderPlaced(
+    outboxWriter.stageEvent(new DomainEvent.OrderPlaced(
             saved.getId(), Instant.now(), saved.getTotalAmount(),
             saved.getOrderLines().size()));
 
@@ -164,7 +164,7 @@ public OrderResponse create(OrderCreateRequest request, String idempotencyKey) {
 <tr>
   <td><strong>Explicit outbox insert in same @Transactional</strong> (our approach)</td>
   <td>JVM crash before commit: both roll back. After commit: both durable. <strong>Zero window.</strong></td>
-  <td>Service knows about OutboxPublisher</td>
+  <td>Service knows about OutboxWriter</td>
   <td>Low — plain JPA, no extra frameworks</td>
   <td class="verdict verdict-chosen">CHOSEN</td>
 </tr>
@@ -241,7 +241,7 @@ With our approach, the answer is always the same: if the database committed, bot
 
 <h3>Key Components</h3>
 <ul>
-  <li><strong>OutboxPublisher</strong> (<code>outbox/OutboxPublisher.java</code>) — Builds CloudEvents 1.0 payload (native SDK), inserts into <code>outbox_events</code>. No <code>@Transactional</code> of its own — inherits the caller's transaction</li>
+  <li><strong>OutboxWriter</strong> (<code>outbox/OutboxWriter.java</code>) — Builds CloudEvents 1.0 payload (native SDK), inserts into <code>outbox_events</code>. No <code>@Transactional</code> of its own — inherits the caller's transaction</li>
   <li><strong>OutboxPoller</strong> (<code>outbox/OutboxPoller.java</code>) — <code>@Scheduled</code> every 1 second. <code>SELECT ... FOR UPDATE SKIP LOCKED</code> ensures parallel pollers claim different rows</li>
   <li><strong>KafkaEventPublisher</strong> (<code>outbox/KafkaEventPublisher.java</code>) — Extracted as separate <code>@Component</code> so <code>@Retryable</code> fires through AOP proxy. 3 attempts with exponential backoff and jitter (<code>delay=200ms, multiplier=2</code>). On failure after retries, the exception propagates to the poller which increments <code>retryCount</code>; after <code>maxRetryCount</code> (default 5) poll-cycle failures, the event is marked FAILED</li>
   <li><strong>Cleanup job</strong> — Deletes PROCESSED entries older than <code>app.outbox.retention-days</code> (default 7) every <code>app.outbox.cleanup-interval-ms</code> (default 1 hour)</li>
@@ -288,7 +288,7 @@ With our approach, the answer is always the same: if the database committed, bot
     record OrderDelivered(Long orderId, Instant timestamp) implements DomainEvent {}
     record OrderCancelled(Long orderId, Instant timestamp) implements DomainEvent {}
 }</code></pre>
-<p>The <code>sealed</code> keyword means adding a new event type without handling it in <code>OutboxPublisher.resolveEventType()</code> is a <strong>compile error</strong>. No event can be silently dropped.</p>
+<p>The <code>sealed</code> keyword means adding a new event type without handling it in <code>OutboxWriter.resolveEventType()</code> is a <strong>compile error</strong>. No event can be silently dropped.</p>
 
 <hr>
 

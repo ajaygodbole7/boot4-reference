@@ -1,5 +1,11 @@
 # REST Exception Handling - Analysis & Strategy
 
+> **SUPERSEDED (2026-03-07):** This analysis was written pre-RFC 9457 refactor. The tasks in the
+> "Final decision" section (Tasks 1–8) are all implemented. The current ExceptionTranslator has
+> 16 handlers (~426 lines), uses `@ProblemType` annotations and `ProblemPropertySource` for
+> structured error responses, and includes slug-based type URIs, OTel traceId correlation, and
+> `Retry-After` headers. See `ExceptionTranslator.java` for the current implementation.
+
 ## Project Context
 - Spring Boot 4.0.3, Spring Framework 7.0.5, Hibernate 7.2.x
 - `spring.mvc.problemdetails.enabled=true` is set in application.properties

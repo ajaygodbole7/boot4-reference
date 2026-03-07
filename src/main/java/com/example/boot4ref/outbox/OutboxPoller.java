@@ -22,8 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code WHERE status = 'PENDING'} filter. Scheduled cleanup deletes processed
  * entries older than the configured retention period.
  *
- * <p><strong>Ordering guarantee:</strong> Events are polled {@code ORDER BY id}. TSID IDs
- * are time-sorted, so insertion order = chronological order. The Kafka partition key
+ * <p><strong>Ordering guarantee:</strong> Events are polled {@code ORDER BY created_at}.
+ * TSID IDs are time-sorted, so created_at order ≈ insertion order. The Kafka partition key
  * ({@code aggregateId}) ensures per-aggregate ordering at the consumer. If Kafka fails
  * mid-batch, the remaining events stay PENDING and the next poll picks them up in the
  * same order.

@@ -1,5 +1,12 @@
 # ExceptionTranslator Redesign: Deep Analysis & Starter Architecture
 
+> **SUPERSEDED (2026-03-07):** Brainstorming document. Of the proposed 4-layer architecture,
+> only Layer 1 was implemented: `@ProblemType` annotation (with `slug` and `title` fields only,
+> no `status`/`scrubDetail`/`retryAfterSeconds`) and `ProblemPropertySource` interface. Layers
+> 2–4 (`ProblemMappingRegistry`, enrichment pipeline, `ResponseEntityExceptionHandler` extension)
+> were not implemented. The line numbers referencing ExceptionTranslator are from a pre-refactor
+> version. See `ExceptionTranslator.java` for the current 16-handler implementation.
+
 Redesigning ExceptionTranslator as a reusable starter for teams building Spring Boot 4 / Java 25 microservices. Three inputs analyzed: wimdeblauwe error-handling-spring-boot-starter, Spring Boot 4's built-in ProblemDetail support, and adversarial review of current implementation.
 
 No code changes in this document. Brainstorming only.
