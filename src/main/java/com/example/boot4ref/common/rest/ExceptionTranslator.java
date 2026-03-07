@@ -71,13 +71,13 @@ public class ExceptionTranslator {
 
     private final boolean isDevProfile;
     private final String errorBaseUrl;
-    private final int retryAfterSeconds;
+    private final String retryAfterHeader;
     private final Map<Class<?>, Optional<ProblemType>> annotationCache = new ConcurrentHashMap<>();
 
     public ExceptionTranslator(Environment env, ApplicationProperties properties) {
         this.isDevProfile = env.acceptsProfiles(Profiles.of("dev"));
         this.errorBaseUrl = properties.getErrorBaseUrl();
-        this.retryAfterSeconds = properties.getRetryAfterSeconds();
+        this.retryAfterHeader = String.valueOf(properties.getRetryAfterSeconds());
     }
 
     // -- Domain exception handlers --
@@ -106,12 +106,8 @@ public class ExceptionTranslator {
     @ExceptionHandler(ServiceUnavailableException.class)
     public ResponseEntity<ProblemDetail> handleServiceUnavailable(
             ServiceUnavailableException ex, HttpServletRequest request) {
-        var response = buildDomainErrorResponse(ex, HttpStatus.SERVICE_UNAVAILABLE,
-                "service-unavailable", "Service Unavailable", request);
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-                .header("Retry-After", String.valueOf(retryAfterSeconds))
-                .body(response.getBody());
+        return withRetryAfter(buildDomainErrorResponse(ex, HttpStatus.SERVICE_UNAVAILABLE,
+                "service-unavailable", "Service Unavailable", request));
     }
 
     // -- Infrastructure exception handlers --
@@ -127,16 +123,9 @@ public class ExceptionTranslator {
     @ExceptionHandler(TransientDataAccessException.class)
     public ResponseEntity<ProblemDetail> handleTransientDataAccess(
             TransientDataAccessException ex, HttpServletRequest request) {
-        ProblemDetail pd = createBaseProblemDetail(HttpStatus.SERVICE_UNAVAILABLE,
+        return withRetryAfter(buildScrubbedErrorResponse(HttpStatus.SERVICE_UNAVAILABLE,
                 "service-temporarily-unavailable", "Service Temporarily Unavailable",
-                ex, request);
-        pd.setDetail("Database temporarily unavailable, please retry");
-        log.error("{} {} -> 503 Service Temporarily Unavailable",
-                request.getMethod(), request.getRequestURI());
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-                .header("Retry-After", String.valueOf(retryAfterSeconds))
-                .body(pd);
+                "Database temporarily unavailable, please retry", ex, request));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -325,39 +314,18 @@ public class ExceptionTranslator {
                 .orElse(null);
         String slug = pt != null ? pt.slug() : defaultSlug;
         String title = pt != null ? pt.title() : defaultTitle;
-        ProblemDetail pd = createBaseProblemDetail(defaultStatus, slug, title, ex, request);
+        var response = buildErrorResponse(defaultStatus, slug, title, ex, request);
         if (ex instanceof ProblemPropertySource source) {
-            source.problemProperties().forEach(pd::setProperty);
+            source.problemProperties().forEach(Objects.requireNonNull(response.getBody())::setProperty);
         }
-        if (defaultStatus == HttpStatus.NOT_FOUND) {
-            log.info("{} {} -> {} {}", request.getMethod(), request.getRequestURI(),
-                    defaultStatus.value(), title);
-        } else if (defaultStatus.is4xxClientError()) {
-            log.warn("{} {} -> {} {}", request.getMethod(), request.getRequestURI(),
-                    defaultStatus.value(), title);
-        } else if (defaultStatus.is5xxServerError()) {
-            log.error("{} {} -> {} {}", request.getMethod(), request.getRequestURI(),
-                    defaultStatus.value(), title);
-        }
-        return ResponseEntity.status(defaultStatus)
-                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-                .body(pd);
+        return response;
     }
 
     private ResponseEntity<ProblemDetail> buildErrorResponse(
             HttpStatus status, String slug, String title,
             Exception ex, HttpServletRequest request) {
         ProblemDetail pd = createBaseProblemDetail(status, slug, title, ex, request);
-        if (status == HttpStatus.NOT_FOUND) {
-            log.info("{} {} -> {} {}", request.getMethod(), request.getRequestURI(),
-                    status.value(), title);
-        } else if (status.is4xxClientError()) {
-            log.warn("{} {} -> {} {}", request.getMethod(), request.getRequestURI(),
-                    status.value(), title);
-        } else if (status.is5xxServerError()) {
-            log.error("{} {} -> {} {}", request.getMethod(), request.getRequestURI(),
-                    status.value(), title);
-        }
+        logAtLevel(status, title, request);
         return ResponseEntity.status(status)
                 .contentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .body(pd);
@@ -369,6 +337,26 @@ public class ExceptionTranslator {
         var response = buildErrorResponse(status, slug, title, ex, request);
         Objects.requireNonNull(response.getBody()).setDetail(safeDetail);
         return response;
+    }
+
+    private ResponseEntity<ProblemDetail> withRetryAfter(ResponseEntity<ProblemDetail> response) {
+        return ResponseEntity.status(response.getStatusCode())
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .header("Retry-After", retryAfterHeader)
+                .body(response.getBody());
+    }
+
+    private void logAtLevel(HttpStatus status, String title, HttpServletRequest request) {
+        if (status == HttpStatus.NOT_FOUND) {
+            log.info("{} {} -> {} {}", request.getMethod(), request.getRequestURI(),
+                    status.value(), title);
+        } else if (status.is4xxClientError()) {
+            log.warn("{} {} -> {} {}", request.getMethod(), request.getRequestURI(),
+                    status.value(), title);
+        } else if (status.is5xxServerError()) {
+            log.error("{} {} -> {} {}", request.getMethod(), request.getRequestURI(),
+                    status.value(), title);
+        }
     }
 
     private ProblemDetail createBaseProblemDetail(

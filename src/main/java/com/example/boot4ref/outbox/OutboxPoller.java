@@ -22,12 +22,18 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code WHERE status = 'PENDING'} filter. Scheduled cleanup deletes processed
  * entries older than the configured retention period.
  *
+ * <p><strong>Ordering guarantee:</strong> Events are polled {@code ORDER BY id}. TSID IDs
+ * are time-sorted, so insertion order = chronological order. The Kafka partition key
+ * ({@code aggregateId}) ensures per-aggregate ordering at the consumer. If Kafka fails
+ * mid-batch, the remaining events stay PENDING and the next poll picks them up in the
+ * same order.
+ *
  * <p><strong>Sizing constraint:</strong> The poll loop holds a DB connection and row locks
- * for the entire batch. Worst-case hold time = {@code BATCH_SIZE × kafka.send.timeout}.
- * With defaults (10 events × 10s timeout = 100s max), ensure HikariCP's
- * {@code maximumPoolSize} has headroom beyond the poller's connection. For higher
- * throughput or stricter latency targets, reduce {@code BATCH_SIZE} — the 1-second
- * poll interval will catch up across multiple cycles.
+ * for the entire batch. Worst-case hold time = {@code batch-size × send-timeout-seconds}.
+ * With defaults (5 events × 5s timeout = 25s max), this stays well under HikariCP's
+ * {@code connection-timeout} (5s) for a single connection. When tuning, keep
+ * {@code batch-size × send-timeout-seconds} comfortably below {@code maximumPoolSize ×
+ * connection-timeout} to avoid connection pool starvation during Kafka slowdowns.
  */
 @Component
 @ConditionalOnProperty(name = "app.outbox.poller.enabled", havingValue = "true", matchIfMissing = true)

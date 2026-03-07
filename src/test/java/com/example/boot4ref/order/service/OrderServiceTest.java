@@ -6,7 +6,7 @@ import com.example.boot4ref.order.exception.UnorderableProductException;
 import com.example.boot4ref.order.repository.OrderRepository;
 import com.example.boot4ref.order.rest.OrderCreateRequest;
 import com.example.boot4ref.order.rest.OrderLineRequest;
-import com.example.boot4ref.outbox.OutboxPublisher;
+import com.example.boot4ref.outbox.OutboxWriter;
 import com.example.boot4ref.product.Product;
 import com.example.boot4ref.product.ProductStatus;
 import com.example.boot4ref.product.repository.ProductRepository;
@@ -42,13 +42,13 @@ class OrderServiceTest {
     private ProductRepository productRepository;
 
     @Mock
-    private OutboxPublisher outboxPublisher;
+    private OutboxWriter outboxWriter;
 
     private OrderService createService(int defaultPageSize, int maxPageSize) {
         ApplicationProperties properties = new ApplicationProperties();
         properties.getPagination().setDefaultPageSize(defaultPageSize);
         properties.getPagination().setMaxPageSize(maxPageSize);
-        return new OrderService(orderRepository, productRepository, outboxPublisher, properties);
+        return new OrderService(orderRepository, productRepository, outboxWriter, properties);
     }
 
     @Test

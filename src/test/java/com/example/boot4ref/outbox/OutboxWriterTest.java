@@ -20,11 +20,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for {@link OutboxPublisher}.
+ * Unit tests for {@link OutboxWriter}.
  * Verifies event type resolution, CloudEvents payload format, and correct outbox entry creation.
  */
 @ExtendWith(MockitoExtension.class)
-class OutboxPublisherTest {
+class OutboxWriterTest {
 
     @Mock
     private OutboxEventRepository outboxEventRepository;
@@ -32,12 +32,12 @@ class OutboxPublisherTest {
     @Captor
     private ArgumentCaptor<OutboxEvent> eventCaptor;
 
-    private OutboxPublisher publisher;
+    private OutboxWriter publisher;
 
     @BeforeEach
     void setUp() {
         ObjectMapper objectMapper = JsonMapper.builder().build();
-        publisher = new OutboxPublisher(outboxEventRepository, objectMapper);
+        publisher = new OutboxWriter(outboxEventRepository, objectMapper);
     }
 
     // --- Event type resolution (sealed exhaustive switch) ---
@@ -47,7 +47,7 @@ class OutboxPublisherTest {
         var event = new DomainEvent.OrderPlaced(1L, Instant.now(), BigDecimal.TEN, 2);
         when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
-        publisher.publish(event);
+        publisher.stageEvent(event);
 
         assertThat(eventCaptor.getValue().getEventType()).isEqualTo(EventTypes.ORDER_PLACED);
     }
@@ -57,7 +57,7 @@ class OutboxPublisherTest {
         var event = new DomainEvent.OrderConfirmed(1L, Instant.now());
         when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
-        publisher.publish(event);
+        publisher.stageEvent(event);
 
         assertThat(eventCaptor.getValue().getEventType()).isEqualTo(EventTypes.ORDER_CONFIRMED);
     }
@@ -67,7 +67,7 @@ class OutboxPublisherTest {
         var event = new DomainEvent.OrderShipped(1L, Instant.now());
         when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
-        publisher.publish(event);
+        publisher.stageEvent(event);
 
         assertThat(eventCaptor.getValue().getEventType()).isEqualTo(EventTypes.ORDER_SHIPPED);
     }
@@ -77,7 +77,7 @@ class OutboxPublisherTest {
         var event = new DomainEvent.OrderDelivered(1L, Instant.now());
         when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
-        publisher.publish(event);
+        publisher.stageEvent(event);
 
         assertThat(eventCaptor.getValue().getEventType()).isEqualTo(EventTypes.ORDER_DELIVERED);
     }
@@ -87,7 +87,7 @@ class OutboxPublisherTest {
         var event = new DomainEvent.OrderCancelled(1L, Instant.now());
         when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
-        publisher.publish(event);
+        publisher.stageEvent(event);
 
         assertThat(eventCaptor.getValue().getEventType()).isEqualTo(EventTypes.ORDER_CANCELLED);
     }
@@ -99,7 +99,7 @@ class OutboxPublisherTest {
         var event = new DomainEvent.OrderPlaced(42L, Instant.now(), BigDecimal.ONE, 1);
         when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
-        publisher.publish(event);
+        publisher.stageEvent(event);
 
         assertThat(eventCaptor.getValue().getAggregateType()).isEqualTo("Order");
     }
@@ -109,7 +109,7 @@ class OutboxPublisherTest {
         var event = new DomainEvent.OrderPlaced(42L, Instant.now(), BigDecimal.ONE, 1);
         when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
-        publisher.publish(event);
+        publisher.stageEvent(event);
 
         assertThat(eventCaptor.getValue().getAggregateId()).isEqualTo(42L);
     }
@@ -119,7 +119,7 @@ class OutboxPublisherTest {
         var event = new DomainEvent.OrderPlaced(1L, Instant.now(), BigDecimal.ONE, 1);
         when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
-        publisher.publish(event);
+        publisher.stageEvent(event);
 
         assertThat(eventCaptor.getValue().getStatus()).isEqualTo(OutboxStatus.PENDING);
     }
@@ -131,7 +131,7 @@ class OutboxPublisherTest {
         var event = new DomainEvent.OrderPlaced(1L, Instant.now(), BigDecimal.TEN, 3);
         when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
-        publisher.publish(event);
+        publisher.stageEvent(event);
 
         String payload = eventCaptor.getValue().getPayload();
         assertThat(payload).contains("\"specversion\"");
@@ -143,7 +143,7 @@ class OutboxPublisherTest {
         var event = new DomainEvent.OrderConfirmed(99L, Instant.now());
         when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
-        publisher.publish(event);
+        publisher.stageEvent(event);
 
         String payload = eventCaptor.getValue().getPayload();
         assertThat(payload).contains("\"Order::confirmed\"");
@@ -154,7 +154,7 @@ class OutboxPublisherTest {
         var event = new DomainEvent.OrderPlaced(55L, Instant.now(), BigDecimal.ONE, 1);
         when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
-        publisher.publish(event);
+        publisher.stageEvent(event);
 
         String payload = eventCaptor.getValue().getPayload();
         assertThat(payload).contains("\"/orders/55\"");
@@ -165,7 +165,7 @@ class OutboxPublisherTest {
         var event = new DomainEvent.OrderPlaced(1L, Instant.now(), BigDecimal.ONE, 1);
         when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
-        publisher.publish(event);
+        publisher.stageEvent(event);
 
         String payload = eventCaptor.getValue().getPayload();
         assertThat(payload).contains("\"datacontenttype\"");
@@ -177,7 +177,7 @@ class OutboxPublisherTest {
         var event = new DomainEvent.OrderPlaced(1L, Instant.now(), new BigDecimal("50.00"), 3);
         when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
-        publisher.publish(event);
+        publisher.stageEvent(event);
 
         String payload = eventCaptor.getValue().getPayload();
         assertThat(payload).contains("\"data\"");
@@ -188,7 +188,7 @@ class OutboxPublisherTest {
         var event = new DomainEvent.OrderPlaced(1L, Instant.now(), BigDecimal.ONE, 1);
         when(outboxEventRepository.saveAndFlush(eventCaptor.capture())).thenAnswer(i -> i.getArgument(0));
 
-        publisher.publish(event);
+        publisher.stageEvent(event);
 
         verify(outboxEventRepository).saveAndFlush(eventCaptor.getValue());
     }

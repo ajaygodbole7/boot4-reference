@@ -18,14 +18,14 @@ import org.springframework.stereotype.Component;
  * Payload is formatted as CloudEvents 1.0 using the native CloudEvents SDK.
  */
 @Component
-public class OutboxPublisher {
+public class OutboxWriter {
 
-    private static final Logger log = LoggerFactory.getLogger(OutboxPublisher.class);
+    private static final Logger log = LoggerFactory.getLogger(OutboxWriter.class);
 
     private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
 
-    public OutboxPublisher(OutboxEventRepository outboxEventRepository, ObjectMapper objectMapper) {
+    public OutboxWriter(OutboxEventRepository outboxEventRepository, ObjectMapper objectMapper) {
         this.outboxEventRepository = outboxEventRepository;
         this.objectMapper = objectMapper;
     }
@@ -34,7 +34,7 @@ public class OutboxPublisher {
      * Inserts a CloudEvents-formatted outbox entry for the given domain event.
      * Must be called within an existing @Transactional context.
      */
-    public void publish(DomainEvent event) {
+    public void stageEvent(DomainEvent event) {
         String eventType = resolveEventType(event);
         String payload = buildCloudEventsPayload(event, eventType);
 

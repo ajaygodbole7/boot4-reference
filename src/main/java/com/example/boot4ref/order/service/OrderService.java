@@ -16,7 +16,7 @@ import com.example.boot4ref.order.rest.OrderLineRequest;
 import com.example.boot4ref.order.rest.OrderLineResponse;
 import com.example.boot4ref.order.rest.OrderResponse;
 import com.example.boot4ref.order.specification.OrderSpecifications;
-import com.example.boot4ref.outbox.OutboxPublisher;
+import com.example.boot4ref.outbox.OutboxWriter;
 import com.example.boot4ref.product.Product;
 import com.example.boot4ref.product.ProductStatus;
 import com.example.boot4ref.product.exception.ProductNotFoundException;
@@ -49,17 +49,17 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
-    private final OutboxPublisher outboxPublisher;
+    private final OutboxWriter outboxWriter;
     private final int defaultPageSize;
     private final int maxPageSize;
 
     public OrderService(OrderRepository orderRepository,
                         ProductRepository productRepository,
-                        OutboxPublisher outboxPublisher,
+                        OutboxWriter outboxWriter,
                         ApplicationProperties properties) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
-        this.outboxPublisher = outboxPublisher;
+        this.outboxWriter = outboxWriter;
         this.defaultPageSize = properties.getPagination().getDefaultPageSize();
         this.maxPageSize = properties.getPagination().getMaxPageSize();
     }
@@ -139,7 +139,7 @@ public class OrderService {
         Order saved = orderRepository.saveAndFlush(order);
 
         // Outbox: insert event in same transaction
-        outboxPublisher.publish(new DomainEvent.OrderPlaced(
+        outboxWriter.stageEvent(new DomainEvent.OrderPlaced(
                 saved.getId(), Instant.now(), saved.getTotalAmount(),
                 saved.getOrderLines().size()));
 
@@ -232,7 +232,7 @@ public class OrderService {
         Order saved = orderRepository.saveAndFlush(order);
 
         // Outbox: insert transition event in same transaction
-        outboxPublisher.publish(createTransitionEvent(saved.getId(), newStatus));
+        outboxWriter.stageEvent(createTransitionEvent(saved.getId(), newStatus));
 
         log.info("Transitioned order id={} from {} to {}", id, current, newStatus);
         return toResponse(saved);

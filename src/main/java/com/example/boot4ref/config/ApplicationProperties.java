@@ -64,7 +64,7 @@ public class ApplicationProperties {
     public static class Outbox {
         @NotNull
         @Min(1) @Max(100)
-        private Integer batchSize = 10;
+        private Integer batchSize = 5;
 
         @NotNull
         @Min(1)
@@ -101,7 +101,7 @@ public class ApplicationProperties {
     public static class Kafka {
         @NotNull
         @Min(1)
-        private Long sendTimeoutSeconds = 10L;
+        private Long sendTimeoutSeconds = 5L;
 
         public Long getSendTimeoutSeconds() { return sendTimeoutSeconds; }
         public void setSendTimeoutSeconds(Long sendTimeoutSeconds) { this.sendTimeoutSeconds = sendTimeoutSeconds; }
