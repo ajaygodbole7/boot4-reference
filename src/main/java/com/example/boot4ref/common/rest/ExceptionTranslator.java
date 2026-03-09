@@ -42,12 +42,14 @@ import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /**
@@ -214,6 +216,20 @@ public class ExceptionTranslator {
                 "Not Acceptable", ex, request);
     }
 
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ProblemDetail> handleMissingServletRequestParameter(
+            MissingServletRequestParameterException ex, HttpServletRequest request) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "missing-request-parameter",
+                "Missing Request Parameter", ex, request);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ProblemDetail> handleNoResourceFound(
+            NoResourceFoundException ex, HttpServletRequest request) {
+        return buildErrorResponse(HttpStatus.NOT_FOUND, "no-resource-found",
+                "No Resource Found", ex, request);
+    }
+
     // -- Method validation handler --
 
     @ExceptionHandler(HandlerMethodValidationException.class)
@@ -237,6 +253,7 @@ public class ExceptionTranslator {
                             List<String> messages =
                                     result.getResolvableErrors().stream()
                                             .map(MessageSourceResolvable::getDefaultMessage)
+                                            .filter(Objects::nonNull)
                                             .toList();
                             errorDetails.put("messages", messages);
 
@@ -325,7 +342,7 @@ public class ExceptionTranslator {
             HttpStatus status, String slug, String title,
             Exception ex, HttpServletRequest request) {
         ProblemDetail pd = createBaseProblemDetail(status, slug, title, ex, request);
-        logAtLevel(status, title, request);
+        logAtLevel(status, title, request, ex);
         return ResponseEntity.status(status)
                 .contentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .body(pd);
@@ -346,7 +363,8 @@ public class ExceptionTranslator {
                 .body(response.getBody());
     }
 
-    private void logAtLevel(HttpStatus status, String title, HttpServletRequest request) {
+    private void logAtLevel(HttpStatus status, String title, HttpServletRequest request,
+            Exception ex) {
         if (status == HttpStatus.NOT_FOUND) {
             log.info("{} {} -> {} {}", request.getMethod(), request.getRequestURI(),
                     status.value(), title);
@@ -355,7 +373,7 @@ public class ExceptionTranslator {
                     status.value(), title);
         } else if (status.is5xxServerError()) {
             log.error("{} {} -> {} {}", request.getMethod(), request.getRequestURI(),
-                    status.value(), title);
+                    status.value(), title, ex);
         }
     }
 

@@ -18,6 +18,7 @@ import jakarta.validation.constraints.Positive;
 import com.example.boot4ref.config.ApplicationProperties;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.junit.jupiter.api.Test;
@@ -214,7 +215,11 @@ class ExceptionTranslatorTest {
     @Test
     void shouldReturn405WhenMethodNotAllowed() throws Exception {
         mockMvc.perform(put("/test/not-found"))
-                .andExpect(status().isMethodNotAllowed());
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/method-not-allowed"))
+                .andExpect(jsonPath("$.title").value("Method Not Allowed"))
+                .andExpect(jsonPath("$.errorCode").value("METHOD_NOT_ALLOWED"));
     }
 
     @Test
@@ -222,7 +227,11 @@ class ExceptionTranslatorTest {
         mockMvc.perform(post("/test/validate")
                         .contentType(MediaType.TEXT_PLAIN)
                         .content("not json"))
-                .andExpect(status().isUnsupportedMediaType());
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/unsupported-media-type"))
+                .andExpect(jsonPath("$.title").value("Unsupported Media Type"))
+                .andExpect(jsonPath("$.errorCode").value("UNSUPPORTED_MEDIA_TYPE"));
     }
 
     @Test
@@ -230,6 +239,28 @@ class ExceptionTranslatorTest {
         mockMvc.perform(get("/test/json-response")
                         .accept(MediaType.APPLICATION_XML))
                 .andExpect(status().isNotAcceptable());
+    }
+
+    @Test
+    void shouldReturn400WhenMissingRequestParameter() throws Exception {
+        mockMvc.perform(get("/test/required-param"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/missing-request-parameter"))
+                .andExpect(jsonPath("$.title").value("Missing Request Parameter"))
+                .andExpect(jsonPath("$.errorCode").value("MISSING_REQUEST_PARAMETER"))
+                .andExpect(jsonPath("$.traceId").exists());
+    }
+
+    @Test
+    void shouldReturn404WhenNoResourceFound() throws Exception {
+        mockMvc.perform(get("/nonexistent/path"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/no-resource-found"))
+                .andExpect(jsonPath("$.title").value("No Resource Found"))
+                .andExpect(jsonPath("$.errorCode").value("NO_RESOURCE_FOUND"))
+                .andExpect(jsonPath("$.traceId").exists());
     }
 
     // -- Other --
@@ -274,6 +305,18 @@ class ExceptionTranslatorTest {
     }
 
     @Test
+    void shouldReturn409WhenDataIntegrityViolation() throws Exception {
+        mockMvc.perform(get("/test/data-integrity-violation"))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/data-integrity-violation"))
+                .andExpect(jsonPath("$.title").value("Data Integrity Violation"))
+                .andExpect(jsonPath("$.detail").value("Operation violates a data integrity constraint (e.g. referenced by other records)"))
+                .andExpect(jsonPath("$.errorCode").value("DATA_INTEGRITY_VIOLATION"))
+                .andExpect(jsonPath("$.traceId").exists());
+    }
+
+    @Test
     void shouldReturn409Not503WhenConcurrencyFailure() throws Exception {
         // ConcurrencyFailureException extends TransientDataAccessException.
         // Verify ExceptionDepthComparator routes to 409, not 503.
@@ -297,7 +340,10 @@ class ExceptionTranslatorTest {
                 .andExpect(jsonPath("$.detail").value("An unexpected internal error occurred"))
                 .andExpect(jsonPath("$.errorCode").value("INTERNAL_SERVER_ERROR"))
                 .andExpect(jsonPath("$.timestamp").exists())
-                .andExpect(jsonPath("$.traceId").exists());
+                .andExpect(jsonPath("$.traceId").exists())
+                .andExpect(jsonPath("$.exception").doesNotExist())
+                .andExpect(jsonPath("$.stackTrace").doesNotExist())
+                .andExpect(jsonPath("$.request").doesNotExist());
     }
 
     // -- Annotation-driven domain exception tests --
@@ -403,9 +449,19 @@ class ExceptionTranslatorTest {
             throw new TransientDataAccessResourceException("Connection refused");
         }
 
+        @GetMapping("/test/data-integrity-violation")
+        public void dataIntegrityViolation() {
+            throw new DataIntegrityViolationException("Unique constraint violated");
+        }
+
         @GetMapping("/test/optimistic-lock-failure")
         public void optimisticLockFailure() {
             throw new ObjectOptimisticLockingFailureException("Product", 42L);
+        }
+
+        @GetMapping("/test/required-param")
+        public String requiredParam(@RequestParam String name) {
+            return "ok:" + name;
         }
 
         @GetMapping("/test/error")
