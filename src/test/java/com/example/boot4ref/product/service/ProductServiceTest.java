@@ -5,6 +5,7 @@ import com.example.boot4ref.product.Product;
 import com.example.boot4ref.product.ProductStatus;
 import com.example.boot4ref.product.exception.ProductConflictException;
 import com.example.boot4ref.product.repository.ProductRepository;
+import com.example.boot4ref.product.rest.ProductPatchRequest;
 import java.math.BigDecimal;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -102,5 +103,51 @@ class ProductServiceTest {
         assertThatThrownBy(() -> service.delete(1L))
                 .isInstanceOf(ProductConflictException.class)
                 .hasMessageContaining("DISCONTINUED");
+    }
+
+    @Test
+    void shouldClearDescriptionWhenClearDescriptionIsTrue() {
+        ProductService service = createService(20, 100);
+        Product product = Product.builder()
+                .name("Widget").description("Original description")
+                .price(new BigDecimal("10.00")).stock(5).status(ProductStatus.ACTIVE).build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(productRepository.saveAndFlush(any(Product.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.patch(1L, new ProductPatchRequest(null, null, null, null, true));
+
+        assertThat(product.getDescription()).isNull();
+    }
+
+    @Test
+    void shouldNotClearDescriptionWhenClearDescriptionIsFalse() {
+        ProductService service = createService(20, 100);
+        Product product = Product.builder()
+                .name("Widget").description("Keep this")
+                .price(new BigDecimal("10.00")).stock(5).status(ProductStatus.ACTIVE).build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(productRepository.saveAndFlush(any(Product.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.patch(1L, new ProductPatchRequest(null, null, null, null, false));
+
+        assertThat(product.getDescription()).isEqualTo("Keep this");
+    }
+
+    @Test
+    void shouldPreferClearDescriptionOverDescriptionValue() {
+        ProductService service = createService(20, 100);
+        Product product = Product.builder()
+                .name("Widget").description("Original")
+                .price(new BigDecimal("10.00")).stock(5).status(ProductStatus.ACTIVE).build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(productRepository.saveAndFlush(any(Product.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // clearDescription=true should take precedence over description="New value"
+        service.patch(1L, new ProductPatchRequest(null, "New value", null, null, true));
+
+        assertThat(product.getDescription()).isNull();
     }
 }

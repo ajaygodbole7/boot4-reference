@@ -45,7 +45,11 @@ public class KafkaEventPublisher {
      * Topic is derived from aggregate type (e.g., "order-events").
      * {@code @Retryable} retries transient Kafka publish failures.
      */
-    @Retryable(retryFor = Exception.class, maxAttempts = KAFKA_RETRY_MAX_ATTEMPTS,
+    @Retryable(retryFor = RuntimeException.class,
+            noRetryFor = {org.apache.kafka.common.errors.SerializationException.class,
+                          org.apache.kafka.common.errors.AuthorizationException.class,
+                          org.apache.kafka.common.errors.AuthenticationException.class},
+            maxAttempts = KAFKA_RETRY_MAX_ATTEMPTS,
             backoff = @Backoff(delay = KAFKA_RETRY_DELAY_MS, multiplier = 2, random = true))
     public void publish(OutboxEvent event) {
         String topic = event.getAggregateType().toLowerCase() + TOPIC_SUFFIX;

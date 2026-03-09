@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -18,8 +19,12 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>No Lombok -- manual Logger per CLAUDE.md (Lombok restricted to @Entity classes).
  * OpenAPI annotations live on {@link OrderApi} -- this class stays focused on HTTP mapping.
+ *
+ * <p>{@code @Validated} enables method-level constraint validation (e.g., {@code @Size}
+ * on the Idempotency-Key header declared in {@link OrderApi}).
  */
 @RestController
+@Validated
 public class OrderController implements OrderApi {
 
     private static final Logger log = LoggerFactory.getLogger(OrderController.class);

@@ -251,6 +251,10 @@ public class OrderService {
         for (OrderLine line : sortedLines) {
             Product product = productRepository.findWithLockById(line.getProduct().getId())
                     .orElseThrow(() -> new ProductNotFoundException(line.getProduct().getId()));
+            if (product.getStatus() == ProductStatus.DISCONTINUED) {
+                log.warn("Skipping stock restore for DISCONTINUED product id={}", product.getId());
+                continue;
+            }
             product.setStock(product.getStock() + line.getQuantity());
             log.debug("Restored {} units to product id={}", line.getQuantity(), product.getId());
         }
