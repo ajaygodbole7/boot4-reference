@@ -118,7 +118,7 @@ class OrderControllerTest {
                                 {"items":[]}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").exists())
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/parameter-validation-error"))
                 .andExpect(jsonPath("$.detail").exists());
     }
 
@@ -130,7 +130,7 @@ class OrderControllerTest {
                                 {"items":[{"productId":null,"quantity":2}]}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").exists())
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/parameter-validation-error"))
                 .andExpect(jsonPath("$.detail").exists());
     }
 
@@ -142,7 +142,7 @@ class OrderControllerTest {
                                 {"items":[{"productId":1,"quantity":0}]}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").exists())
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/parameter-validation-error"))
                 .andExpect(jsonPath("$.detail").exists());
     }
 
@@ -154,7 +154,7 @@ class OrderControllerTest {
                                 {"items":[{"productId":1,"quantity":-1}]}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").exists())
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/parameter-validation-error"))
                 .andExpect(jsonPath("$.detail").exists());
     }
 
@@ -297,7 +297,7 @@ class OrderControllerTest {
                                 {}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").exists())
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/request-body-validation-error"))
                 .andExpect(jsonPath("$.detail").exists());
     }
 
@@ -362,7 +362,9 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/unorderable-product"))
                 .andExpect(jsonPath("$.title").value("Unorderable Product"))
                 .andExpect(jsonPath("$.detail").value(
-                        "Product 1 is DRAFT and cannot be ordered"));
+                        "Product 1 is DRAFT and cannot be ordered"))
+                .andExpect(jsonPath("$.productId").value(1))
+                .andExpect(jsonPath("$.productStatus").value("DRAFT"));
     }
 
     @Test
@@ -457,6 +459,7 @@ class OrderControllerTest {
                                 {"items":[{"productId":1,"quantity":2}]}
                                 """))
                 .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/data-integrity-violation"))
                 .andExpect(jsonPath("$.title").value("Data Integrity Violation"));
     }
 }

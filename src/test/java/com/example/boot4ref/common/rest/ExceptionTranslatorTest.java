@@ -90,6 +90,7 @@ class ExceptionTranslatorTest {
     void shouldReturn404WhenProductNotFoundExceptionThrown() throws Exception {
         mockMvc.perform(get("/test/product-not-found"))
                 .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/product-not-found"))
                 .andExpect(jsonPath("$.title").value("Product Not Found"))
                 .andExpect(jsonPath("$.detail").value("Product not found with id: 42"))
@@ -102,6 +103,7 @@ class ExceptionTranslatorTest {
     void shouldReturn404WhenOrderNotFoundExceptionThrown() throws Exception {
         mockMvc.perform(get("/test/order-not-found"))
                 .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/order-not-found"))
                 .andExpect(jsonPath("$.title").value("Order Not Found"))
                 .andExpect(jsonPath("$.detail").value("Order not found with id: 99"))
@@ -126,18 +128,22 @@ class ExceptionTranslatorTest {
     void shouldReturn409WhenProductConflictExceptionThrown() throws Exception {
         mockMvc.perform(get("/test/product-conflict"))
                 .andExpect(status().isConflict())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/product-conflict"))
                 .andExpect(jsonPath("$.title").value("Product Conflict"))
-                .andExpect(jsonPath("$.errorCode").value("PRODUCT_CONFLICT"));
+                .andExpect(jsonPath("$.errorCode").value("PRODUCT_CONFLICT"))
+                .andExpect(jsonPath("$.traceId").exists());
     }
 
     @Test
     void shouldReturn409WhenOrderConflictExceptionThrown() throws Exception {
         mockMvc.perform(get("/test/order-conflict"))
                 .andExpect(status().isConflict())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/order-conflict"))
                 .andExpect(jsonPath("$.title").value("Order Conflict"))
-                .andExpect(jsonPath("$.errorCode").value("ORDER_CONFLICT"));
+                .andExpect(jsonPath("$.errorCode").value("ORDER_CONFLICT"))
+                .andExpect(jsonPath("$.traceId").exists());
     }
 
     @Test
@@ -179,6 +185,7 @@ class ExceptionTranslatorTest {
     void shouldReturn400WhenConstraintViolation() throws Exception {
         mockMvc.perform(get("/test/constraint-violation"))
                 .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/constraint-violation"))
                 .andExpect(jsonPath("$.title").value("Constraint Violation"))
                 .andExpect(jsonPath("$.errorCode").value("CONSTRAINT_VIOLATION"))
@@ -191,13 +198,15 @@ class ExceptionTranslatorTest {
         mockMvc.perform(get("/test/validated-param")
                         .param("id", "0"))
                 .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/parameter-validation-error"))
                 .andExpect(jsonPath("$.title").value("Validation Error"))
                 .andExpect(jsonPath("$.errorCode").value("PARAMETER_VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.validationErrors").isArray())
                 .andExpect(jsonPath("$.validationErrors[0].parameter").exists())
                 .andExpect(jsonPath("$.validationErrors[0].type").exists())
-                .andExpect(jsonPath("$.validationErrors[0].messages").isArray());
+                .andExpect(jsonPath("$.validationErrors[0].messages").isArray())
+                .andExpect(jsonPath("$.traceId").exists());
     }
 
     // -- HTTP errors --
@@ -254,6 +263,7 @@ class ExceptionTranslatorTest {
     void shouldReturn503WhenTransientDataAccessFailure() throws Exception {
         mockMvc.perform(get("/test/transient-failure"))
                 .andExpect(status().isServiceUnavailable())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/service-temporarily-unavailable"))
                 .andExpect(jsonPath("$.title").value("Service Temporarily Unavailable"))
                 .andExpect(jsonPath("$.detail").value("Database temporarily unavailable, please retry"))
@@ -269,10 +279,12 @@ class ExceptionTranslatorTest {
         // Verify ExceptionDepthComparator routes to 409, not 503.
         mockMvc.perform(get("/test/optimistic-lock-failure"))
                 .andExpect(status().isConflict())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/concurrency-conflict"))
                 .andExpect(jsonPath("$.title").value("Concurrency Conflict"))
                 .andExpect(jsonPath("$.detail").value("Concurrent modification conflict, please retry"))
-                .andExpect(jsonPath("$.status").value(409));
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.traceId").exists());
     }
 
     @Test
@@ -308,9 +320,11 @@ class ExceptionTranslatorTest {
     void shouldFallbackToDefaultsWhenNoProblemTypeAnnotation() throws Exception {
         mockMvc.perform(get("/test/business-rule-unannotated"))
                 .andExpect(status().isUnprocessableEntity())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("https://api.boot4ref.example.com/errors/business-rule-violation"))
                 .andExpect(jsonPath("$.title").value("Business Rule Violation"))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"));
+                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.traceId").exists());
     }
 
     // -- Test-only controller for triggering exceptions --
