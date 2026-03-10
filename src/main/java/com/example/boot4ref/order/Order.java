@@ -7,7 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.OrderBy;
+
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
@@ -44,7 +44,6 @@ public class Order extends AbstractAuditingEntity {
 
     // Vlad Mihalcea: List not Set, CascadeType.ALL + orphanRemoval, bidirectional sync
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("id ASC")
     private List<OrderLine> orderLines = new ArrayList<>();
 
     protected Order() {}

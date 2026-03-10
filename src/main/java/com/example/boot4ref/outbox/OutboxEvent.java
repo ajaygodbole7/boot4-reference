@@ -8,7 +8,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import jakarta.persistence.Version;
+
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -55,10 +55,6 @@ public class OutboxEvent {
 
     @Column(name = "retry_count", nullable = false)
     private int retryCount;
-
-    @Version
-    @Column(name = "version", nullable = false)
-    private int version;
 
     protected OutboxEvent() {}
 
