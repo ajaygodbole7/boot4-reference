@@ -16,11 +16,24 @@ public final class TsidFactory {
 
     private static final TSID.Factory INSTANCE = buildFactory();
 
+    private static final int MAX_NODE_ID = 1023;
+
     private static TSID.Factory buildFactory() {
         TSID.Factory.Builder builder = TSID.Factory.builder();
-        String nodeId = System.getenv("TSID_NODE_ID");
-        if (nodeId != null && !nodeId.isBlank()) {
-            builder.withNode(Integer.parseInt(nodeId));
+        String nodeIdEnv = System.getenv("TSID_NODE_ID");
+        if (nodeIdEnv != null && !nodeIdEnv.isBlank()) {
+            int nodeId;
+            try {
+                nodeId = Integer.parseInt(nodeIdEnv);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException(
+                        "TSID_NODE_ID must be an integer 0–" + MAX_NODE_ID + ", got: '" + nodeIdEnv + "'", e);
+            }
+            if (nodeId < 0 || nodeId > MAX_NODE_ID) {
+                throw new IllegalArgumentException(
+                        "TSID_NODE_ID must be 0–" + MAX_NODE_ID + ", got: " + nodeId);
+            }
+            builder.withNode(nodeId);
         }
         return builder.build();
     }

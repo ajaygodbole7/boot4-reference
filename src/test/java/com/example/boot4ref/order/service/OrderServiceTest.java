@@ -231,15 +231,17 @@ class OrderServiceTest {
         order.computeTotal();
 
         when(orderRepository.findByIdWithLines(1L)).thenReturn(Optional.of(order));
-        when(productRepository.findWithLockById(100L)).thenReturn(Optional.of(discontinued));
+        // Only active product should be locked — discontinued is skipped before lock
         when(productRepository.findWithLockById(200L)).thenReturn(Optional.of(active));
         when(orderRepository.saveAndFlush(any(Order.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         service.transition(1L, OrderStatus.CANCELLED);
 
-        // Discontinued product stock unchanged, active product stock restored
+        // Discontinued product: no lock acquired, stock unchanged
+        verify(productRepository, never()).findWithLockById(100L);
         assertThat(discontinued.getStock()).isEqualTo(0);
+        // Active product: lock acquired, stock restored
         assertThat(active.getStock()).isEqualTo(13);
     }
 }
